@@ -1,0 +1,194 @@
+
+Transcript. Use arrow keys to navigate between transcript entries. Select an entry to navigate the media to the time of the entry.
+
+
+Search
+
+AI-generated content may be incorrect
+
+Brandon Vanek started transcription
+
+Brandon Vanek
+0 minutes 7 seconds0:07
+Brandon Vanek 0 minutes 7 seconds
+And actually...
+Brandon Vanek 0 minutes 9 seconds
+kind of want this on the other screen. So we'll give it one second.
+Brandon Vanek 0 minutes 15 seconds
+There you go.
+Brandon Vanek 0 minutes 17 seconds
+And we'll try that again.
+Brandon Vanek 0 minutes 26 seconds
+Javier, what's up?
+JM
+
+Javier Martinez
+0 minutes 28 seconds0:28
+Javier Martinez 0 minutes 28 seconds
+Is this going to be a 10 or 12 week cohort? We were told 10.
+
+Brandon Vanek
+0 minutes 32 seconds0:32
+Brandon Vanek 0 minutes 32 seconds
+It's going to be a 10-week call.
+JM
+
+Javier Martinez
+0 minutes 34 seconds0:34
+Javier Martinez 0 minutes 34 seconds
+Okay.
+
+Brandon Vanek
+0 minutes 35 seconds0:35
+Brandon Vanek 0 minutes 35 seconds
+Yeah, that's correct.
+Brandon Vanek 0 minutes 39 seconds
+Yeah, like I said, welcome. Hope you guys are doing well. I'm looking forward to being with you guys for the next 10 weeks to go over everything Agentic AI's cohort is going to be very interesting, especially if you haven't done Agentic AI before. But even so, I will just say all the tools that we're using, the content itself, Agentic AI is absolutely cutting edge stuff. You know, there's really not
+Brandon Vanek 1 minute 3 seconds
+a lot of people in the industry that have this experience. There's a lot of apprehension to AI, and people that are early adopters have been gaining wide success with this kind of stuff. So really excited for you guys to get tooled and be able to work with all this stuff, because I can tell you actually from personal experience and making Agentic AI services and enterprise patterns.
+Brandon Vanek 1 minute 26 seconds
+It's really fun. So looking forward to being able to pass that knowledge off to you guys. Talking a little bit about training here so far. I'm going to go through a couple of different sections. Some of you might have seen something similar to this already. Bear with me. But we'll start off with a little bit of trainer introduction, which is me.
+Brandon Vanek 1 minute 45 seconds
+go through Canvas, how that works. We'll probably get you set up with Canvas Accounts once we get your SkillStorm emails provisioned, and that'll happen at some point today. So don't worry if you don't have access to that already. We'll go through the course schedule and the overview, how assignments work, quality odds, mock interviews, et cetera. Basically just giving you what I'm looking for
+Brandon Vanek 2 minutes 4 seconds
+with regard to those different assignments to set you up for success. And you'll have this video to refer back to, you know, for preparing for those assignments.
+Brandon Vanek 2 minutes 17 seconds
+So, hello, my name is Brandon Vanek. As I mentioned before, I'm A principal architect here at SkillStorm. I've been working here for about four years. I think it's not quite four years, but we're coming up on it. I have, I think, what, 11 certifications, 12 certifications, something like that, in Java, AWS, Power Platform. I even got an expert certification in Power Platform.
+Brandon Vanek 2 minutes 38 seconds
+Microsoft Azure. I have obviously experience creating Agentic AI applications. We created, me along with Patrick Walsh have created the Agentic AI recruiter that you guys might have talked to during your process of recruitment.
+Brandon Vanek 2 minutes 56 seconds
+Did anybody talk to Matt during their recruitment process?
+Brandon Vanek 3 minutes 1 second
+Anyone, anyone at all?
+Brandon Vanek 3 minutes 3 seconds
+might be more likely for them.
+RJ
+Regan Johnson
+3 minutes 4 seconds3:04
+Regan Johnson 3 minutes 4 seconds
+I think.
+ET
+Edward Tavarez
+3 minutes 4 seconds3:04
+Edward Tavarez 3 minutes 4 seconds
+I have, yes.
+CE
+
+Charles Eaton
+29 minutes 36 seconds29:36
+Charles Eaton 29 minutes 36 seconds
+Yeah, so I guess like on our first interview or when we first do this, you know, we jump into a call with you and you're there, we, you know, say hi, and then when that recording hits, it's almost as if we never met you for the first time and you're our, you know, interviewer and we need to take that air of speaking to someone that, you know, we may have not known.
+Charles Eaton 29 minutes 57 seconds
+For about a week now.
+Charles Eaton 30 minutes
+Would you agree?
+
+Brandon Vanek
+30 minutes30:00
+Brandon Vanek 30 minutes
+And we're going to get very close after a week. So it'll be very difficult to do that. I'm joking, obviously, but thank you for the question, Charles. Now, that's a great point because, you know, there can be some confusion over that. So I'm glad that you mentioned it. In general, I'm going to give you a call literally directly.
+Brandon Vanek 30 minutes 21 seconds
+You'll just get a call from me on Monday. Obviously, we'll have a list and I'll be like, here's the order. You'll in general know when you're going to have your interview, but I'll give you a call on Teams and you're going to come in that call as if we have never met.
+Brandon Vanek 30 minutes 36 seconds
+So, hey, good afternoon, Brandon. How are you doing today? Or at least I'll say, like, I'll introduce myself. I'll be like, hey, Chris, how you doing today? And Chris will be like, hey, Brandon, you know, I'm doing great. Super happy to be here. I hope you're having a great day. All right. Introduce yourself as if, you know, you're meeting someone for the first time. So
+Brandon Vanek 30 minutes 56 seconds
+polite, professional, et cetera, and then we'll go into the interview. So something I'd probably not be looking for is, hey, what up?
+Brandon Vanek 31 minutes 10 seconds
+Gentlemen, not going to reflect well.
+Brandon Vanek 31 minutes 14 seconds
+Right. If you went in the client or, you know, if you walked up to your client, someone that we have like a business relationship with, and you're like, hey, what up? They're going to be like.
+Brandon Vanek 31 minutes 25 seconds
+What?
+Brandon Vanek 31 minutes 27 seconds
+What? Like, who do you think you are kind of thing? So just always err on the side of, oh, this is a good piece of advice for your career as well. I tend to err on the side of professionalism until someone else opens the air, especially if that person is in a more significant position.
+Brandon Vanek 31 minutes 46 seconds
+than you. So like say, you know, you're working with a CEO or you're working with just like a senior manager or something like that. Err on the side of professionalism and politeness. If they open up, feel free to open up a little bit.
+Brandon Vanek 32 minutes 1 second
+But, but you know, test the air first, right? So be professional for, always stand on the professional leg first before you do anything else. It just tends to go over a lot better.
+Brandon Vanek 32 minutes 15 seconds
+It reflects better on you as a as a employee, I guess you could say.
+Brandon Vanek 32 minutes 21 seconds
+Partner.
+Brandon Vanek 32 minutes 23 seconds
+Any other questions on mock interviews? Robert.
+RE
+
+Robert Evans
+32 minutes 27 seconds32:27
+Robert Evans 32 minutes 27 seconds
+Yes, so for both the interviews and the presentations, we have to dress up.
+
+Brandon Vanek
+32 minutes 33 seconds32:33
+Brandon Vanek 32 minutes 33 seconds
+Yes, yeah, yeah, good question, good question. Yeah, so for...
+RE
+
+Robert Evans
+32 minutes 35 seconds32:35
+Robert Evans 32 minutes 35 seconds
+Go.
+
+Brandon Vanek
+32 minutes 39 seconds32:39
+Brandon Vanek 32 minutes 39 seconds
+Not for exams, but for quality audits, mock interviews, and projects. All three of those, I will be expecting you guys to be dressed business professional.
+Brandon Vanek 32 minutes 51 seconds
+For everyday lecture when we're in the room, you know, even when you guys are, when we're not in lecture and you guys are working on, you know, studying or working on particular applications or labs or anything like that, business casual. So polo shirt, you know, something comfortable, but not too comfortable, obviously. Don't wear a t-shirt or...
+Brandon Vanek 33 minutes 9 seconds
+you know, a tank top or something like that, business casual. But for those three evaluations, projects, mock interviews, and quality audits, business professional.
+Brandon Vanek 33 minutes 22 seconds
+I'll try to remind you, but don't count on me.
+Brandon Vanek 33 minutes 26 seconds
+Because it's your responsibility to remember. Charles.
+CE
+
+Charles Eaton
+33 minutes 30 seconds33:30
+Charles Eaton 33 minutes 30 seconds
+Yeah, I don't think you mentioned or I don't remember if we did, but for the projects, there's just going to be presentations. That's why you're saying we need to dress up, correct? And we'll have to be presenting our projects. Yeah.
+
+Brandon Vanek
+33 minutes 37 seconds33:37
+Brandon Vanek 33 minutes 37 seconds
+Yeah.
+Brandon Vanek 33 minutes 39 seconds
+Yeah.
+Brandon Vanek 33 minutes 42 seconds
+So yeah, you don't have to dress up while you're building your project. You don't have to dress up in business professional every single day. Be a little counterintuitive. Just for the project presentations three times during the entire course.
+Brandon Vanek 33 minutes 58 seconds
+So in reality, you'll be in business professional a couple times a week.
+Brandon Vanek 34 minutes 3 seconds
+Usually twice, sometimes three.
+Brandon Vanek 34 minutes 8 seconds
+Um...
+Brandon Vanek 34 minutes 10 seconds
+But, uh, but most of the time, you know, it's not a big deal. It's a couple times, you know.
+Brandon Vanek 34 minutes 16 seconds
+I don't know, some people like suits more or less. I don't mind it that much.
+Brandon Vanek 34 minutes 24 seconds
+Any other questions?
+Brandon Vanek 34 minutes 33 seconds
+No, no, no, Brandon, how are you doing today? No questions?
+Brandon Vanek 34 minutes 41 seconds
+Okay.
+Brandon Vanek 34 minutes 44 seconds
+Yeah, that's the last one. All right.
+Brandon Vanek 34 minutes 47 seconds
+Yeah.
+Brandon Vanek 34 minutes 49 seconds
+So.
+Brandon Vanek 34 minutes 51 seconds
+We've been going on for...
+Brandon Vanek 34 minutes 54 seconds
+Little while.
+Brandon Vanek 34 minutes 58 seconds
+Get Reagan back in the room here.
+RJ
+
+Regan Johnson
+35 minutes 7 seconds35:07
+Regan Johnson 35 minutes 7 seconds
+Chad.
+
+Brandon Vanek stopped transcription
