@@ -1,6 +1,10 @@
 """pure filter , and info return file for getting information on tickers """
 import json
 from pathlib import Path
+from typing import Iterable , Any , Callable 
+
+TicketDict = dict[str , Any]
+
 _DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 
 
@@ -28,6 +32,46 @@ def filter_by_tenant(tickets: list[dict] , tenant : str) -> list[dict]:
     return [ticket for ticket in tickets if ticket.get("tenant", "") == tenant ] #ticket["tenant"]
 
 
+def created_at(ticket: TicketDict):
+    """"Sort key : pull the timestamp that 'sorted()' should order the tickets by ."""
+    created:str = ticket["created_at"]
+    return created 
+
+def most_recent(tickets: Iterable[TicketDict], n: int = 5):
+    """"Return the n most recently created tickets """
+    return sorted(tickets,key=created_at , reverse = True )[:n]
+
+def format_ticket_row(ticket: TicketDict) -> str :
+    """Return a one line human readable summary of a ticket """
+    short_title = ticket["title"]
+    if len(short_title)> 50:
+       short_title = short_title[:47] + "..."
+
+       return  {
+           f"{ticket['id']:<10}"
+           f"{ticket['priority']:<8}"
+           f"{ticket['status']:<20}"
+           f"{short_title}"
+
+       }
+    
+#higher order functions and closures
+def matches(
+        predicate: Callable[[TicketDict], bool],
+
+)-> Callable[[list[TicketDict]],list[TicketDict]]:
+       """Return a filter function scoped to a single predicate.
+       This is a closure : the returned function rememberes the predicate .
+       """
+       
+       def apply(tickets:list[TicketDict]) -> list[TicketDict]:
+        return [ticket for ticket in tickets if predicate(ticket)] 
+
+       return apply 
+       
+
+
+
 if __name__ == "__main__":
     tickets = load_tickets()
     # print(len(tickets))
@@ -35,12 +79,52 @@ if __name__ == "__main__":
     # print(type(tickets[0]))
     # print(json.dumps(tickets[0], indent= 2))
 
+    #lambda functiuon , aonymous function that allows you tio create and run/pass a function in-line 
+    is_urgent = matches(lambda ticket: ticket["priority"] == "urgent")
+
+
+
+    is_billing = matches(lambda ticket: ticket["category"]== "billing")
+
+
+    is_high_billing = matches(lambda ticket: ticket["priority"] == "high" and ticket["category"] == "billing")
+
+
+
+    print(len(is_urgent(tickets)))
+    print(len (is_billing(tickets)))
+    print(len (is_high_billing(tickets)))
+
+
+    # for ticket in most_recent(tickets , n=5):
+    #     print(format_ticket_row(ticket))
+
+    # print("\n === 10 most recent urgent tickets ====")
+    # for ticket in most_recent(filter_by_priority(tickets, "urgent"), n=10):
+    #     print(format_ticket_row(ticket)) 
+
+    #list comprehension
+    urgent_titles: list[dict] = [ticket["title"] for ticket in tickets if ticket.get("priority","") =="urgent"]
+    # print(f"Urgent ticket count: {len(urgent_titles)}")
+
+    #Set comprehension
+    tenants = {ticket["tenant"] for ticket in tickets}
+    # print(f"Tenants : {sorted(tenants)}")
+
+
+    #dict comprehension
+    title_by_id = {ticket["id"]: ticket["title"] for ticket in tickets}
+    # print(f'lookup TKT-10005 {title_by_id.get("TKT-10005", "Not Found")}')
+    #nested comprehension
+
+    all_tags = {tag for ticket in tickets for tag in ticket.get("tags", [])}
+    # print(f'all tags {all_tags}')
 
     urgent = filter_by_priority(tickets , "urgent")
-    print(f"urgent: {len(urgent)}")
+    # print(f"urgent: {len(urgent)}")
 
     # acme = filter_by_tenant(tickets , "acme-corp")
     # print(f"acme-corp tickets : {len(acme)}")
 
     acme = filter_by_tenant(tickets , "acme-corp")
-    print(f"acme-corp tickets :{len(acme)}")
+    # print(f"acme-corp tickets :{len(acme)}")
