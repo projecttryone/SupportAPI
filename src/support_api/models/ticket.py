@@ -27,3 +27,30 @@ class Tickets(BaseModel):
     tags:list[str] = Field(default_factory=list , max_length=10)
     created_at : datetime 
     updated_at : datetime
+
+
+if __name__ == "__main__":
+    import json 
+    from pathlib import Path
+    from pydantic import ValidationError
+    from support_api.filters import load_tickets
+
+    #valid input returns a ticket instance
+    raw_ticket = load_tickets()[0]
+    ticket = Tickets.model_validate(raw_ticket)
+    print(f"Valid: id ={ticket.id}  priority={ticket.priority}")
+    print(f"type of priority field: {type(ticket.priority).__name__}")
+
+    #model_dump serializes back to a dict 
+    dumped = ticket.model_dump()
+    print(f"Dumped keys: {sorted(dumped.keys())}")
+    print(f"ecntire model dics  {dict}")
+
+
+    #invalid input raising a structured error 
+    try:
+        Ticket.model_validate({**raw_ticket , "priority":"blocker"})
+    except ValidationError as err:
+        print("Validation error raised with: ")
+        for detail in err.errors():
+            print(f"    loc={detail["loc"]} type ={detail["type"]}  msg={deatil["msg"]}")

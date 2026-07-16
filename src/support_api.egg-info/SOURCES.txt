@@ -13,3 +13,5 @@ src/support_api/models/__init__.py
 src/support_api/models/customer.py
 src/support_api/models/ticket.py
 src/support_api/tests/conftest.py
+src/support_api/tests/test_filters.py
+src/support_api/tests/test_routing_rules.py
