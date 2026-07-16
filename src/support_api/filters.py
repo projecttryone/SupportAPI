@@ -47,7 +47,7 @@ def format_ticket_row(ticket: TicketDict) -> str :
     if len(short_title)> 50:
        short_title = short_title[:47] + "..."
 
-       return  {
+    return  {
            f"{ticket['id']:<10}"
            f"{ticket['priority']:<8}"
            f"{ticket['status']:<20}"
@@ -81,20 +81,12 @@ if __name__ == "__main__":
 
     #lambda functiuon , aonymous function that allows you tio create and run/pass a function in-line 
     is_urgent = matches(lambda ticket: ticket["priority"] == "urgent")
-
-
-
     is_billing = matches(lambda ticket: ticket["category"]== "billing")
-
-
     is_high_billing = matches(lambda ticket: ticket["priority"] == "high" and ticket["category"] == "billing")
-
-
 
     print(len(is_urgent(tickets)))
     print(len (is_billing(tickets)))
     print(len (is_high_billing(tickets)))
-
 
     # for ticket in most_recent(tickets , n=5):
     #     print(format_ticket_row(ticket))
