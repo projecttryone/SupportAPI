@@ -1,0 +1,1521 @@
+#!/usr/bin/env python3
+"""Build the Week 1 Python Fundamentals study guide PDF for Pratik's exam + mock interview."""
+import re
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.enums import TA_LEFT, TA_CENTER
+from reportlab.platypus import (
+    BaseDocTemplate, PageTemplate, Frame, Paragraph, Spacer, PageBreak,
+    Table, TableStyle, Preformatted, KeepTogether, HRFlowable,
+)
+
+# ---------------------------------------------------------------- palette
+NAVY   = colors.HexColor("#16324f")
+INK    = colors.HexColor("#1f2937")
+MUT    = colors.HexColor("#5b6472")
+ACCENT = colors.HexColor("#c2410c")
+CODE_BG = colors.HexColor("#f5f6f8")
+CODE_BD = colors.HexColor("#d7dae1")
+BUG_BG, BUG_FG = colors.HexColor("#fdeeee"), colors.HexColor("#a11d1d")
+FIX_BG, FIX_FG = colors.HexColor("#ecf7f0"), colors.HexColor("#166534")
+TIP_BG, TIP_FG = colors.HexColor("#fff6e6"), colors.HexColor("#92400e")
+AGT_BG, AGT_FG = colors.HexColor("#ecf2fb"), colors.HexColor("#1d4ed8")
+ROW_ALT = colors.HexColor("#f2f4f7")
+
+W, H = letter
+LM = RM = 0.75 * inch
+TM, BM = 0.7 * inch, 0.7 * inch
+CW = W - LM - RM  # content width
+
+# ---------------------------------------------------------------- styles
+def st(name, **kw):
+    base = dict(fontName="Helvetica", fontSize=9.6, leading=13.6, textColor=INK,
+                alignment=TA_LEFT, spaceBefore=0, spaceAfter=5)
+    base.update(kw)
+    return ParagraphStyle(name, **base)
+
+S = {
+    "h1": st("h1", fontName="Helvetica-Bold", fontSize=19, leading=23,
+             textColor=NAVY, spaceBefore=0, spaceAfter=8),
+    "h1sub": st("h1sub", fontName="Helvetica-Oblique", fontSize=10.5, leading=14,
+                textColor=MUT, spaceAfter=12),
+    "h2": st("h2", fontName="Helvetica-Bold", fontSize=13.5, leading=17,
+             textColor=NAVY, spaceBefore=13, spaceAfter=5),
+    "h3": st("h3", fontName="Helvetica-Bold", fontSize=11, leading=14,
+             textColor=ACCENT, spaceBefore=10, spaceAfter=3.5),
+    "p": st("p"),
+    "pmut": st("pmut", textColor=MUT, fontSize=9, leading=12.5),
+    "b": st("b", leftIndent=14, bulletIndent=4, spaceAfter=3.4),
+    "q": st("q", fontName="Helvetica-Bold", spaceBefore=7, spaceAfter=2,
+            textColor=NAVY),
+    "a": st("a", leftIndent=14, spaceAfter=6),
+    "codetitle": st("codetitle", fontName="Helvetica-Bold", fontSize=8.4,
+                    textColor=MUT, spaceBefore=7, spaceAfter=2),
+    "cover_t": st("cover_t", fontName="Helvetica-Bold", fontSize=27, leading=32,
+                  textColor=NAVY, alignment=TA_LEFT, spaceAfter=6),
+    "cover_s": st("cover_s", fontSize=13, leading=18, textColor=ACCENT,
+                  fontName="Helvetica-Bold", spaceAfter=16),
+    "cover_p": st("cover_p", fontSize=10.5, leading=15.5, textColor=INK,
+                  spaceAfter=8),
+    "callout_t": st("callout_t", fontName="Helvetica-Bold", fontSize=9.6,
+                    spaceAfter=2),
+    "callout_p": st("callout_p", fontSize=9.3, leading=13, spaceAfter=0),
+    "code": ParagraphStyle("code", fontName="Courier", fontSize=7.9, leading=10.6,
+                           textColor=INK),
+    "th": st("th", fontName="Helvetica-Bold", fontSize=9, leading=12,
+             textColor=colors.white, spaceAfter=0),
+    "td": st("td", fontSize=8.9, leading=12, spaceAfter=0),
+}
+
+def esc(s: str) -> str:
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+def rich(s: str) -> str:
+    """Escape, then restore a tiny markup set: **bold**, `code`, [[term]] accent."""
+    s = esc(s)
+
+    def _code(m):
+        inner = m.group(1).replace("*", "&#42;")  # keep bold pass out of code spans
+        return f'<font face="Courier" size="8.6" color="#334155">{inner}</font>'
+
+    s = re.sub(r"`([^`]+)`", _code, s)
+    s = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s)
+    s = re.sub(r"\[\[(.+?)\]\]", r'<b><font color="#c2410c">\1</font></b>', s)
+    return s
+
+# ---------------------------------------------------------------- flowable builders
+def code_block(body: str, title: str | None = None):
+    pre = Preformatted(esc(body.rstrip("\n")), S["code"])
+    t = Table([[pre]], colWidths=[CW])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), CODE_BG),
+        ("BOX", (0, 0), (-1, -1), 0.6, CODE_BD),
+        ("LINEBEFORE", (0, 0), (0, -1), 2.4, NAVY),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    out = []
+    if title:
+        out.append(Paragraph(rich(title), S["codetitle"]))
+    out.append(t)
+    out.append(Spacer(1, 6))
+    return out
+
+CALLOUT_KIND = {
+    "bug":   ("BUG",        BUG_BG, BUG_FG),
+    "fix":   ("THE FIX",    FIX_BG, FIX_FG),
+    "tip":   ("EXAM TIP",   TIP_BG, TIP_FG),
+    "say":   ("SAY THIS IN THE INTERVIEW", TIP_BG, TIP_FG),
+    "agent": ("AGENTIC AI LINK", AGT_BG, AGT_FG),
+}
+
+def callout(kind: str, title: str, body: str):
+    label, bg, fg = CALLOUT_KIND[kind]
+    tstyle = ParagraphStyle(f"ct_{kind}", parent=S["callout_t"], textColor=fg)
+    head = Paragraph(f"{label}{' - ' if title else ''}{rich(title)}", tstyle)
+    para = Paragraph(rich(body), S["callout_p"])
+    t = Table([[head], [para]], colWidths=[CW])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), bg),
+        ("LINEBEFORE", (0, 0), (0, -1), 2.4, fg),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (0, 0), 6),
+        ("BOTTOMPADDING", (0, 0), (0, 0), 1),
+        ("TOPPADDING", (0, 1), (0, 1), 1),
+        ("BOTTOMPADDING", (0, 1), (0, 1), 6),
+    ]))
+    return [KeepTogether([t]), Spacer(1, 7)]
+
+def table2(headers, rows, widths):
+    data = [[Paragraph(rich(h), S["th"]) for h in headers]]
+    for r in rows:
+        data.append([Paragraph(rich(c), S["td"]) for c in r])
+    t = Table(data, colWidths=widths, repeatRows=1)
+    style = [
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("GRID", (0, 0), (-1, -1), 0.5, CODE_BD),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]
+    for i in range(1, len(data)):
+        if i % 2 == 0:
+            style.append(("BACKGROUND", (0, i), (-1, i), ROW_ALT))
+    t.setStyle(TableStyle(style))
+    return [t, Spacer(1, 8)]
+
+# ---------------------------------------------------------------- doc + footer
+class Guide(BaseDocTemplate):
+    def __init__(self, path):
+        super().__init__(path, pagesize=letter, leftMargin=LM, rightMargin=RM,
+                         topMargin=TM, bottomMargin=BM,
+                         title="Support-API Week 1 Study Guide",
+                         author="Prepared for Pratik Sharma")
+        frame = Frame(LM, BM, CW, H - TM - BM, id="main")
+        self.addPageTemplates([
+            PageTemplate(id="cover", frames=[frame], onPage=self._cover_page),
+            PageTemplate(id="body", frames=[frame], onPage=self._body_page),
+        ])
+
+    def _cover_page(self, canv, doc):
+        canv.saveState()
+        canv.setFillColor(NAVY)
+        canv.rect(0, H - 0.62 * inch, W, 0.62 * inch, stroke=0, fill=1)
+        canv.setFillColor(ACCENT)
+        canv.rect(0, H - 0.70 * inch, W, 0.08 * inch, stroke=0, fill=1)
+        canv.setFillColor(colors.white)
+        canv.setFont("Helvetica-Bold", 10)
+        canv.drawString(LM, H - 0.42 * inch, "GUIDEHOUSE AGENTIC AI FOUNDRY COHORT  -  WEEK 1")
+        canv.restoreState()
+
+    def _body_page(self, canv, doc):
+        canv.saveState()
+        canv.setStrokeColor(CODE_BD)
+        canv.setLineWidth(0.5)
+        canv.line(LM, BM - 8, W - RM, BM - 8)
+        canv.setFont("Helvetica", 7.6)
+        canv.setFillColor(MUT)
+        canv.drawString(LM, BM - 19, "Support-API  -  Week 1 Python Fundamentals: Exam + Mock Interview Guide")
+        canv.drawRightString(W - RM, BM - 19, f"Page {doc.page}")
+        canv.restoreState()
+
+# ---------------------------------------------------------------- content DSL
+story = []
+def h1(t, sub=None, new_page=True):
+    if new_page:
+        story.append(PageBreak())
+    story.append(Paragraph(rich(t), S["h1"]))
+    story.append(HRFlowable(width="100%", thickness=1.6, color=ACCENT,
+                            spaceBefore=0, spaceAfter=6))
+    if sub:
+        story.append(Paragraph(rich(sub), S["h1sub"]))
+
+def h2(t): story.append(Paragraph(rich(t), S["h2"]))
+def h3(t): story.append(Paragraph(rich(t), S["h3"]))
+def p(t):  story.append(Paragraph(rich(t), S["p"]))
+def pm(t): story.append(Paragraph(rich(t), S["pmut"]))
+def bullets(items):
+    for it in items:
+        story.append(Paragraph(rich(it), S["b"], bulletText="\u2022"))
+    story.append(Spacer(1, 3))
+def code(body, title=None): story.extend(code_block(body, title))
+def box(kind, title, body): story.extend(callout(kind, title, body))
+def tab(headers, rows, widths): story.extend(table2(headers, rows, widths))
+def qa(q, a, acode=None):
+    items = [Paragraph(rich("Q. " + q), S["q"]), Paragraph(rich(a), S["a"])]
+    if acode:
+        items += code_block(acode)
+    story.append(KeepTogether(items))
+def gap(h=8): story.append(Spacer(1, h))
+
+# ================================================================ COVER
+story.append(Spacer(1, 1.15 * inch))
+story.append(Paragraph("Week 1: Python Fundamentals", S["cover_t"]))
+story.append(Paragraph("Exam + One-on-One Mock Interview Study Guide", S["cover_s"]))
+story.append(HRFlowable(width="100%", thickness=2, color=NAVY, spaceAfter=16))
+story.append(Paragraph(rich(
+    "Built around the **support-api ticketing project** - your actual code, your actual "
+    "data (50 tickets, 20 customers, 3 tenants), and the exact concepts from the "
+    "week's curriculum: environments, collections, comprehensions, regex, generators, "
+    "higher-order functions, classes, routing logic, pytest, decorators, context "
+    "managers, and Pydantic."), S["cover_p"]))
+story.append(Paragraph(rich(
+    "It also includes something no generic guide has: **Part 7 documents 14 real bugs found "
+    "in your uploaded code**, each mapped to the exam concept it tests - fixing them is the "
+    "single best revision exercise available to you before Monday."), S["cover_p"]))
+story.append(Spacer(1, 10))
+tab(["Part", "What it covers"],
+    [["0", "How to use this guide + the interview technique that wins mock interviews"],
+     ["1", "The project map: files, data model, how everything connects"],
+     ["2", "Day 1 - Environment, pyproject.toml, packages, dicts and JSON"],
+     ["3", "Day 2 - Collections, comprehensions, regex"],
+     ["4", "Day 3 - Generators, pipelines, closures and higher-order functions"],
+     ["5", "Day 4 - Classes, the TicketRouter, custom exceptions, pytest"],
+     ["6", "Day 5 - Decorators, context managers, Pydantic, structlog"],
+     ["7", "14 bugs found in YOUR code - fix these before the exam"],
+     ["8", "The agentic AI bridge - why each pattern matters for Weeks 3-10"],
+     ["9", "Mock interview drill - walkthrough script, 40+ Q&A, terminology bank"],
+     ["10", "One-page cheat sheet"]],
+    [0.55 * inch, CW - 0.55 * inch])
+story.append(Spacer(1, 14))
+pm("Prepared July 17, 2026  -  based on filters.py, stream.py, routing_rules.py, utils.py, "
+   "enrich.py, loggin.py, models/, tests/, tickets.json, and customers.json as uploaded.")
+
+# ================================================================ PART 0
+h1("Part 0 - How to Use This Guide",
+   "Ten minutes here changes how you score on everything else.")
+
+h2("For the written exam")
+bullets([
+    "Parts 2-6 mirror the five days of the curriculum. Each ends with an **Interview drill** - "
+    "those questions double as exam predictions, because instructors test what they taught.",
+    "Part 7 is your highest-leverage session: every bug in your own code is a concept the exam "
+    "can test. Debugging code you wrote beats re-reading notes - retrieval practice over recognition.",
+    "Part 10 is the night-before and morning-of review. Everything else feeds it.",
+])
+
+h2("For the one-on-one mock interview: name it, then explain it")
+p("You already understand these concepts - you built a working project with them. The risk in a "
+  "live interview is different: retrieving the **precise label** under pressure. Interviewers "
+  "score the vocabulary almost as much as the explanation, because the label is how engineers "
+  "communicate on real teams. So train one habit all weekend:")
+box("say", "The three-beat answer pattern",
+    "**Beat 1 - the term:** \"That's [[lazy evaluation]].\"  "
+    "**Beat 2 - one-sentence definition:** \"The generator produces values only when asked, "
+    "instead of computing everything up front.\"  "
+    "**Beat 3 - your project:** \"In my support-api, `stream_tickets()` yields one ticket at a "
+    "time, so a filter pipeline never holds more than one record in memory.\" "
+    "Lead with the term every single time. If you blank on a term, describe the behavior "
+    "confidently and keep moving - never stall.")
+p("Every model answer in this guide follows that pattern, and Part 9 ends with a **terminology "
+  "bank** - the exact words to produce under pressure.")
+
+h2("Your unfair advantage")
+p("Most cohort peers will answer interview questions with textbook examples. You can answer "
+  "every question with `filters.py`, `TicketRouter`, or `atomic_write` - real code you wrote, "
+  "with real bugs you found and fixed (Part 7 hands you that story). \"Tell me about a bug you "
+  "debugged\" is the most predictable interview question in existence, and after this weekend "
+  "you'll have a genuinely good answer to it.")
+
+# ================================================================ PART 1
+h1("Part 1 - The Project Map",
+   "The mock interview almost certainly opens with: \"Walk me through your project.\" Own this page.")
+
+h2("Folder structure and what each file is for")
+code('''supportapi/                        <- project root
+|-- .venv/                         <- isolated environment (never committed)
+|-- pyproject.toml                 <- project manifest: name, deps, dev extras
+|-- Data/                          <- tickets.json (50 tickets), customers.json (20)
+|-- src/
+|   `-- support_api/               <- the importable package (__init__.py makes it one)
+|       |-- filters.py             <- eager helpers: load, filter, sort, closures
+|       |-- stream.py              <- lazy layer: generators + where/tag/take pipeline
+|       |-- routing_rules.py       <- TicketRouter, RoutingDecision, custom exceptions
+|       |-- utils.py               <- cross-cutting: @timed decorator, atomic_write CM
+|       |-- enrich.py              <- async enrichment: httpx + semaphore concurrency
+|       |-- loggin.py              <- structlog configuration (JSON vs console)
+|       |-- models/                <- Pydantic boundary: Ticket, Customer + Literal types
+|       `-- tests/                 <- pytest suite + conftest.py fixtures
+|-- support_api.egg-info/          <- created by `pip install -e .` (editable install)
+`-- .env / .gitignore / README.md''')
+p("One sentence per file is all an interviewer needs. The deeper story is the **layering**: "
+  "`filters` works eagerly on lists, `stream` re-implements the same ideas lazily with "
+  "generators, `routing_rules` makes decisions, `models` validates the boundary, `utils` wraps "
+  "everything with timing and safe writes, and `tests` proves it all works. That progression - "
+  "eager to lazy to validated to tested - **is** the Week 1 syllabus.")
+
+h2("The data model you should know cold")
+tab(["Field", "Values / shape (from the real tickets.json)"],
+    [["`id`", "`TKT-#####` - e.g. TKT-10001 (50 tickets total)"],
+     ["`priority`", "low, normal, high, urgent  (4 values - a set comprehension proves it)"],
+     ["`category`", "billing, technical, account, general"],
+     ["`status`", "open, in_progress, waiting_on_customer, resolved, closed"],
+     ["`tenant`", "acme-corp, globex-inc, initech  (multi-tenant isolation matters)"],
+     ["`customer_id`", "`CUS-#####` - joins to customers.json (20 customers, 3 plans)"],
+     ["`channel` / `assignee`", "email, chat, phone, portal  /  string or null (use `.get()`)"],
+     ["`tags` / timestamps", "list of strings  /  ISO-8601 `created_at`, `updated_at`"]],
+    [1.35 * inch, CW - 1.35 * inch])
+box("tip", "Why interviewers love multi-tenant data",
+    "`filter_by_tenant` is not just a filter - it's **tenant isolation**, a security concern. "
+    "Saying \"tenant scoping prevents one customer's tickets leaking into another's view\" "
+    "instantly sounds like production experience, because it is.")
+
+# ================================================================ PART 2
+h1("Part 2 - Day 1: Environment and Fundamentals",
+   "Virtual environments, pyproject.toml, packages, entry points, and dictionary discipline.")
+
+h2("Virtual environments")
+p("A virtual environment is a **self-contained set of installed packages scoped to one "
+  "project**. Without it, every project on the machine shares one global site-packages: "
+  "version conflicts, bloated dependencies, unreproducible builds.")
+code('''python -m venv .venv              # create it (a folder, nothing magic)
+source .venv/bin/activate         # macOS/Linux    (Windows: .venv\\Scripts\\activate)
+which python                      # verify: should point INSIDE .venv
+pip install -e ".[dev]"           # editable install + dev extras''',
+     "The four commands to know")
+box("tip", "The classic Day-1 exam question",
+    "\"Your program can't find a module you know you installed. First thing you check?\" "
+    "Answer: **am I in the right virtual environment?** Check `which python` (or "
+    "`where python`), re-activate, reinstall. The curriculum calls this the most common "
+    "mistake of the week - expect it on the exam.")
+
+h2("pyproject.toml - the project manifest")
+p("Modern Python's equivalent of `package.json` (Node) or `pom.xml` (Java). It declares name, "
+  "required Python version, dependencies - and crucially, **named dependency groups** so dev "
+  "tools never ship to production.")
+code('''[project]
+name = "support-api"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["structlog>=24.4", "pydantic>=2.10", "httpx"]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+# install runtime deps + dev extras, in editable mode:
+#   pip install -e ".[dev]"''')
+bullets([
+    "**Editable install (`-e`)**: pip links to your source instead of copying it, so edits "
+    "take effect immediately without reinstalling. The `support_api.egg-info/` folder in your "
+    "project is the visible evidence that you ran it - mention that in the interview.",
+    "**Two-step habit**: adding a package to `pyproject.toml` installs nothing. Edit the file, "
+    "**then** run `pip install -e \".[dev]\"`. Forgetting step 2 is the #1 source of "
+    "ModuleNotFoundError all week.",
+])
+
+h2("What makes a folder a package")
+p("`__init__.py` inside `support_api/` marks it as an **importable package**. It can be empty "
+  "(yours is) or it can curate the public surface - your `models/__init__.py` does exactly "
+  "that with `__all__`, re-exporting `Ticket`, `Customer`, and the Literal types so callers "
+  "write `from support_api.models import Ticket` instead of reaching into submodules.")
+
+h2("The entry-point guard")
+code('''if __name__ == "__main__":
+    tickets = load_tickets()          # demo / manual test code lives here''')
+p("When a file is **run directly**, Python sets `__name__` to `\"__main__\"` and the block "
+  "executes. When the file is **imported**, `__name__` is the module's dotted name and the "
+  "block is skipped. That's why every module in your project ends with one: you can demo "
+  "`filters.py` standalone, yet importing it from `stream.py` triggers nothing. (Well - "
+  "almost nothing: your `filters.py` has a module-level `print(\"DATA_DIR:...\")` that runs "
+  "on **every** import. Delete it; module import should be side-effect free.)")
+
+h2("Dictionaries, JSON, and the `[]` vs `.get()` decision")
+p("A dict is Python's native key-value store and maps 1:1 onto JSON objects - which is why "
+  "`json.load(fh)` on tickets.json hands you `list[dict]` directly. The access decision is a "
+  "guaranteed exam item:")
+tab(["Access", "Behavior", "Use when"],
+    [["`ticket[\"priority\"]`", "Raises **KeyError** if missing",
+      "Key is guaranteed; a missing value should crash loudly"],
+     ["`ticket.get(\"assignee\", \"Unassigned\")`", "Returns the fallback if missing",
+      "External / user-supplied data - in agentic systems, almost always"]],
+    [1.85 * inch, 1.85 * inch, CW - 3.7 * inch])
+box("agent", "Why .get() is an agent-safety habit",
+    "Upstream data feeding an agent is unpredictable - a webhook payload or an LLM tool call "
+    "may omit fields. `.get()` with a sane default keeps the pipeline alive; `[]` turns one "
+    "missing key into a crashed run. Your `filter_by_priority` already does it right: "
+    "`ticket.get(\"priority\", \"\").lower()`.")
+
+h2("Type hints - and one subtlety your own bug proves")
+p("Hints like `def route_ticket(ticket: dict) -> str:` are optional to the interpreter but "
+  "essential to teammates, tooling - and later, to **LLMs that read your signatures to decide "
+  "how to call your functions**. One subtlety worth knowing because your codebase demonstrates "
+  "both sides of it (Part 7, bugs 7 and 8):")
+bullets([
+    "**Function-parameter annotations are evaluated at `def` time.** A typo like "
+    "`def seed_tickets(data_dir: PAth)` raises `NameError: name 'PAth' is not defined` the "
+    "moment the module loads.",
+    "**Local-variable annotations are never evaluated.** `result: List[TicketDict] = []` with "
+    "an unimported `List` runs fine - it's only metadata. Same typo class, opposite outcome.",
+])
+
+h3("Interview drill - Day 1")
+qa("What problem do virtual environments solve?",
+   "[[Dependency isolation]]. Each project gets its own package set, so two projects can pin "
+   "conflicting versions and builds stay reproducible. Created with `python -m venv .venv`; "
+   "every `pip install` after activation stays contained.")
+qa("What is pyproject.toml and why split dependency groups?",
+   "The project [[manifest]] - name, Python requirement, dependencies. Groups like `dev` keep "
+   "test and lint tooling out of production installs: `pip install -e \".[dev]\"` locally, "
+   "plain install in prod. Smaller images, smaller attack surface.")
+qa("What does the -e flag do in pip install -e?",
+   "[[Editable install]] - pip places a link to my source tree instead of copying files, so "
+   "code changes apply without reinstalling. The generated `egg-info/` folder is its artifact.")
+qa("What does __init__.py do?",
+   "Marks a directory as an importable [[package]]. Optionally curates the public API - my "
+   "`models/__init__.py` re-exports `Ticket` and `Customer` and declares `__all__`.")
+qa("Explain if __name__ == \"__main__\".",
+   "The [[entry-point guard]]. `__name__` is `\"__main__\"` only when the file runs directly, "
+   "so demo code executes then - but never on import. Every module in my project uses it.")
+qa("KeyError-safe dictionary access?",
+   "`.get(key, default)`. Square brackets raise [[KeyError]] on a missing key - right when "
+   "absence is a bug; `.get()` is right for external data. My filters use "
+   "`ticket.get(\"priority\", \"\")` because upstream JSON isn't guaranteed.")
+
+# ================================================================ PART 3
+h1("Part 3 - Day 2: Collections, Comprehensions, Regex",
+   "Choosing the right container, writing SQL-shaped one-liners, and knowing regex's limits.")
+
+h2("The four core collections - the comparison table to memorize")
+tab(["Type", "Ordered?", "Mutable?", "Dupes?", "Reach for it when..."],
+    [["`list`", "Yes", "Yes", "Yes", "Sequence matters; you add/remove items"],
+     ["`tuple`", "Yes", "**No**", "Yes",
+      "Fixed data; needs to be a dict key (immutable = [[hashable]])"],
+     ["`set`", "No", "Yes", "**No**", "Deduplication and fast membership tests"],
+     ["`dict`", "Insertion", "Yes", "Keys: no", "Key-value lookup; JSON's native shape"]],
+    [0.7*inch, 0.75*inch, 0.75*inch, 0.7*inch, CW - 2.9*inch])
+p("The exam-favorite connection: **tuples can be dict keys, lists cannot**, because dict keys "
+  "must be hashable and hashability requires immutability. And the canonical set demo comes "
+  "straight from your data: loop 50 tickets adding each `priority` to a set - you end with "
+  "exactly `{\"low\", \"normal\", \"high\", \"urgent\"}` no matter how many times each repeats.")
+
+h2("Comprehensions - all four forms, from your filters.py")
+p("A comprehension is Python's `SELECT ... FROM ... WHERE` - extract, filter, and transform in "
+  "one readable expression: `[expression for item in iterable if condition]`.")
+code('''# 1. LIST comprehension - titles of urgent tickets
+urgent_titles = [t["title"] for t in tickets if t.get("priority", "") == "urgent"]
+
+# 2. SET comprehension - unique tenants (curly braces, no colon)
+tenants = {t["tenant"] for t in tickets}                # -> 3 tenants
+
+# 3. DICT comprehension - instant lookup table (curly braces WITH key: value)
+title_by_id = {t["id"]: t["title"] for t in tickets}
+title_by_id.get("TKT-10005", "Not Found")
+
+# 4. NESTED comprehension - two for-clauses, left-to-right like nested loops
+all_tags = {tag for t in tickets for tag in t.get("tags", [])}''',
+     "Your actual code (filters.py __main__)")
+bullets([
+    "Read nested comprehensions **left to right as nested for-loops**: outer loop first "
+    "(`for t in tickets`), inner second (`for tag in t.get(...)`).",
+    "Syntax tell: curly braces **with** `key: value` = dict; **without** = set. Empty `{}` is "
+    "a dict - an empty set is `set()`.",
+    "Cost model: a comprehension **materializes a new list in memory - O(n)**. Fine at 50 "
+    "tickets; at 5 million, you want Day 3's generators. Saying that trade-off unprompted is "
+    "an interview point-scorer.",
+])
+
+h2("Sorting with a key function")
+code('''def created_at(ticket):                 # the SORT KEY: what to order by
+    return ticket["created_at"]
+
+def most_recent(tickets, n=5):
+    return sorted(tickets, key=created_at, reverse=True)[:n]''',
+     "filters.py - most_recent")
+p("`sorted()` accepts any callable as `key` - your first taste of functions-as-values, one day "
+  "before closures make it formal. ISO-8601 timestamps sort correctly as plain strings, which "
+  "is exactly why the format exists. A lambda works too: "
+  "`sorted(tickets, key=lambda t: t[\"created_at\"], reverse=True)[:n]`.")
+
+h2("Regular expressions - the two patterns of the week")
+code('''import re
+
+# A. Extract HTTP error codes from ticket bodies
+codes = re.findall(r"\\b[45]\\d{2}\\b", ticket["body"])     # ['404', '500', ...]
+
+# B. Detect admin-access requests (case-insensitive alternation)
+ADMIN = re.compile(r"tenant admin|admin access|owner role", re.IGNORECASE)
+wants_admin = [t for t in tickets if ADMIN.search(t.get("body", ""))]''')
+tab(["Token", "Meaning in `\\b[45]\\d{2}\\b`"],
+    [["`r\"...\"`", "Raw string - backslashes reach the regex engine untouched. Always use for patterns."],
+     ["`\\b`", "Word boundary - anchors the match so 1404 or 5000 don't slip through"],
+     ["`[45]`", "Character class: exactly one of 4 or 5 (4xx client / 5xx server errors)"],
+     ["`\\d{2}`", "Exactly two digits - `{2}` is a repetition count on `\\d`"]],
+    [1.0*inch, CW - 1.0*inch])
+bullets([
+    "`re.findall(pattern, text)` returns **all** matches as a list; `re.search(pattern, text)` "
+    "returns the **first** match object or `None` - so it's the truthy/falsy one for boolean "
+    "checks like the admin detector.",
+    "**The famous caveat**: the error-code pattern also matches `$499` in \"a $499 charge\" - "
+    "the digits stand alone as a word, and regex can't know it's a price. Regex matches "
+    "[[shape, not meaning]].",
+])
+box("agent", "Why regex is taught one week before LLMs",
+    "Rules-based extraction is fast, cheap, deterministic - and semantically blind. The $499 "
+    "false positive is the whole argument for Week 3: an LLM classifier reads context and "
+    "knows a price from a status code. The production answer is usually **regex for cheap "
+    "pre-filtering, LLM for judgment** - say exactly that when asked about regex limits.")
+
+h3("Interview drill - Day 2")
+qa("When tuple over list?",
+   "When data is fixed - and whenever I need a dict key or set member, because tuples are "
+   "[[immutable]] and therefore [[hashable]]; lists are neither.")
+qa("Fastest way to get unique values from 50 tickets?",
+   "A [[set comprehension]]: `{t[\"tenant\"] for t in tickets}`. Sets enforce uniqueness on "
+   "insert - no manual dedup loop.")
+qa("What does {t[\"id\"]: t[\"title\"] for t in tickets} build, and why?",
+   "A [[dict comprehension]] building a lookup table - O(1) average lookup by ID afterward, "
+   "instead of an O(n) scan per lookup.")
+qa("re.search vs re.findall?",
+   "`search` returns the **first** match object or `None` (ideal for boolean detection); "
+   "`findall` returns **every** match as a list (ideal for extraction). Admin detection uses "
+   "search; error-code harvesting uses findall.")
+qa("Why the r prefix on regex strings?",
+   "A [[raw string]] stops Python from interpreting backslashes, so `\\b` reaches the regex "
+   "engine as a word boundary instead of becoming a backspace character first.")
+qa("Limits of regex for text extraction?",
+   "Regex matches [[shape, not meaning]] - my error-code pattern also catches `$499`. It "
+   "can't use context. That's why the roadmap replaces this extraction with an LLM in Week 3; "
+   "regex stays useful as a cheap deterministic pre-filter.")
+qa("What's the memory cost of a comprehension?",
+   "It [[materializes]] the full result list - O(n) memory. For huge or unbounded streams the "
+   "answer is a [[generator expression]] or generator function: same syntax with parentheses, "
+   "lazy instead of eager.")
+
+# ================================================================ PART 4
+h1("Part 4 - Day 3: Generators and Higher-Order Functions",
+   "Lazy streams, the where/tag/take pipeline, closures, and the function factory.")
+
+h2("Generator functions and yield")
+code('''def stream_tickets(path=None) -> Iterator[TicketDict]:
+    target = path or (_DATA_DIR / "tickets.json")
+    with target.open(encoding="utf-8") as fh:
+        for ticket in json.load(fh):
+            yield ticket          # pause here; resume on the next request''',
+     "stream.py - your generator")
+p("`yield` turns a function into a **generator function**. Calling it runs *no body code* - "
+  "it returns a [[generator object]] (an iterator). Each `next(gen)` (or loop iteration) runs "
+  "until the next `yield`, hands back one value, and **freezes all local state** until asked "
+  "again. That on-demand production is [[lazy evaluation]] - say the term.")
+bullets([
+    "`next(stream)` pulls exactly one ticket; a `for` loop pulls until exhaustion; a finished "
+    "generator raises [[StopIteration]] (the for-loop absorbs it silently).",
+    "Generators are [[single-pass]]: once exhausted, they're done. Re-reading means calling "
+    "`stream_tickets()` again for a fresh generator - a favorite trick question.",
+    "Why it matters: `json.load()` on 5M tickets stalls or crashes; a generator pipeline holds "
+    "**one record at a time**.",
+])
+box("say", "The nuance that separates you from the cohort",
+    "Your own docstring already flags it: this generator still calls `json.load(fh)`, which "
+    "**parses the whole file into memory first** - the laziness applies to everything "
+    "*downstream*, not to the file read. True incremental parsing needs a streaming parser "
+    "like `ijson`, or JSON-Lines with one object per line. Volunteering that honest limitation "
+    "plus its fix is a senior-signal moment in a mock interview.")
+
+h2("The pipeline: where -> tag -> take")
+code('''def where(tickets, predicate):            # FILTER the stream (generator)
+    for ticket in tickets:
+        if predicate(ticket):
+            yield ticket
+
+def tag(tickets, field, compute):         # ENRICH without mutating (generator)
+    for ticket in tickets:
+        yield {**ticket, field: compute(ticket)}     # new dict via unpacking
+
+def take(tickets, n):                     # MATERIALIZE - the pipeline's end
+    result: list[TicketDict] = []
+    for ticket in tickets:
+        if len(result) >= n:
+            break
+        result.append(ticket)
+    return result                         # return, not yield - eager on purpose''',
+     "stream.py (with Part 7's fixes applied)")
+code('''stream  = stream_tickets()
+high_b  = where(stream, lambda t: t["priority"] == "high" and t["category"] == "billing")
+flagged = tag(high_b, "needs_review", lambda t: t["status"] in {"open", "in_progress"})
+five    = take(flagged, 5)      # nothing upstream ran until THIS line pulled''',
+     "Composed - one ticket in flight at any moment")
+bullets([
+    "`where` and `tag` use `yield`, so each is itself a generator - that's what makes them "
+    "**composable** stages. `take` uses `return` because someone has to end the laziness and "
+    "[[materialize]] concrete output.",
+    "`{**ticket, field: value}` is [[dictionary unpacking]]: copy every original key, add one "
+    "computed field, **never mutate the input**. Non-mutating enrichment keeps upstream data "
+    "trustworthy - the same discipline your async `enrich_ticket` follows.",
+    "A `predicate` (another term to say out loud) is any function returning a bool - the "
+    "`Callable[[dict], bool]` contract in your type hints.",
+])
+box("agent", "Context bloat - the Week 5 echo",
+    "Dumping 500 tickets into an agent's prompt degrades its reasoning the same way "
+    "`json.load` on everything degrades memory. Streaming one chunk at a time is both the "
+    "memory answer *and* the context-management answer. One pattern, two payoffs - this "
+    "mapping is explicitly in the curriculum, so expect it as an exam question.")
+
+h2("Higher-order functions, closures, and the factory")
+code('''def matches(predicate: Callable[[TicketDict], bool]
+            ) -> Callable[[list[TicketDict]], list[TicketDict]]:
+    """Return a filter function scoped to one predicate."""
+    def apply(tickets: list[TicketDict]) -> list[TicketDict]:
+        return [t for t in tickets if predicate(t)]
+    return apply                     # apply REMEMBERS predicate: a closure
+
+is_urgent       = matches(lambda t: t["priority"] == "urgent")
+is_billing      = matches(lambda t: t["category"] == "billing")
+is_high_billing = matches(lambda t: t["priority"] == "high"
+                          and t["category"] == "billing")''',
+     "filters.py - matches()")
+p("Three terms live in this one function - be able to point at each:")
+bullets([
+    "[[Higher-order function]]: takes a function as input, returns a function as output - "
+    "`matches` does both.",
+    "[[Closure]]: the inner `apply` captures `predicate` from its enclosing scope and "
+    "**remembers it after `matches` has returned**. Each call to `matches` mints a new "
+    "`apply` with its own captured predicate.",
+    "[[Factory pattern]] applied to functions: `matches` manufactures configured filters on "
+    "demand. Works because Python functions are [[first-class]] - passable, returnable, "
+    "assignable like any value.",
+])
+p("**Lambda rules**: a lambda is a one-off anonymous function limited to a **single "
+  "expression** - no statements, no annotations. Perfect as a throwaway predicate argument; "
+  "the moment logic needs two steps or a name for reuse, promote it to a `def`.")
+
+h3("Interview drill - Day 3")
+qa("What happens the moment you call a generator function?",
+   "Nothing in the body runs - I get back a [[generator object]]. Execution starts on the "
+   "first `next()` and pauses at each `yield`, preserving all local state between pulls.")
+qa("yield vs return?",
+   "`return` ends a call with one final value. `yield` pauses and hands out one value per "
+   "request, making the function a [[generator]] - resumable, lazy, memory-flat. In my "
+   "pipeline, `where`/`tag` yield to stay composable; `take` returns to materialize.")
+qa("Why do generators scale where lists don't?",
+   "[[Lazy evaluation]] - O(1) memory per record instead of O(n) for the whole dataset. "
+   "5M tickets stream fine; `json.load` on them wouldn't. Honest caveat I'd add: my file "
+   "*read* is still eager - true incremental parsing needs `ijson` or JSON-Lines.")
+qa("What is a closure? Point to one you wrote.",
+   "A function that [[captures variables from its enclosing scope]] and keeps them alive "
+   "after that scope exits. My `matches()` returns `apply`, which permanently remembers the "
+   "`predicate` it was built with - that's how `is_urgent` and `is_billing` stay independent.")
+qa("What is a higher-order function?",
+   "One that takes and/or returns functions. `matches` does both; `sorted(key=...)`, `map`, "
+   "and `filter` are stdlib examples. It works because Python functions are [[first-class]] "
+   "values.")
+qa("When is a lambda the wrong tool?",
+   "Anything beyond a single expression, anything reused, anything needing a docstring or a "
+   "debuggable name. Then a named `def` - lambdas are for inline throwaway predicates.")
+qa("Why did you annotate the predicate as Callable[[dict], bool]?",
+   "It's the [[contract]]: takes one dict, returns a bool. Readers, type checkers - and "
+   "later, LLM agents introspecting my signatures to plan tool calls - all rely on it.")
+qa("Can you iterate a generator twice?",
+   "No - generators are [[single-pass]]. After exhaustion they only raise StopIteration; "
+   "I create a fresh one, or materialize to a list if I genuinely need multiple passes.")
+
+# ================================================================ PART 5
+h1("Part 5 - Day 4: Classes, Routing Logic, Testing",
+   "When objects earn their place, the TicketRouter design, exception hierarchies, and pytest.")
+
+h2("When to use a class at all")
+p("Python is not OO-first. The deciding question - quote it verbatim in the interview - is: "
+  "**\"do state and behavior need to travel together?\"** State alone: a dict is simpler. "
+  "Behavior alone: a function is simpler. Both, encapsulated: a class. `TicketRouter` "
+  "qualifies because it *holds* an ordered rule list (state) and *knows how* to route against "
+  "it (behavior).")
+
+h2("@dataclass(frozen=True) - the fast path for value objects")
+code('''@dataclass(frozen=True)
+class RoutingDecision:
+    """The router's answer for a single ticket."""
+    queue: str
+    rule_name: str
+    confidence: float          # 0.0 - 1.0''',
+     "routing_rules.py")
+bullets([
+    "`@dataclass` auto-generates `__init__`, `__repr__`, and `__eq__` from the annotated "
+    "fields - three methods you'd otherwise hand-write.",
+    "`frozen=True` makes instances [[immutable]]: assignment after creation raises "
+    "`FrozenInstanceError`. Immutable also means [[hashable]] - usable as dict keys / set "
+    "members - and it *signals intent*: a decision, once made, is final.",
+    "Vocabulary: this is a [[DTO]] (data transfer object) / [[value object]]. Skip "
+    "`@dataclass` when you need custom constructor logic or real method complexity.",
+])
+
+h2("The method trio - you used all three, which makes a perfect answer")
+p("\"Difference between @staticmethod, @classmethod, and @property?\" is a top-five Python "
+  "interview question, and `TicketRouter` contains all three:")
+tab(["Decorator", "First arg", "Your example", "One-line purpose"],
+    [["`@staticmethod`", "none", "`_rule_matches(rule, ticket)`",
+      "Pure logic, no `self` - lives in the class for organization only"],
+     ["`@classmethod`", "`cls`", "`with_defaults()`",
+      "[[Alternative constructor]] - `cls(DEFAULT_RULES)` also works for subclasses"],
+     ["`@property`", "`self`", "`rule_count`",
+      "Computed attribute - method logic behind attribute syntax (no parentheses)"]],
+    [1.15*inch, 0.6*inch, 1.7*inch, CW - 3.45*inch])
+p("A subtle point worth volunteering: because `with_defaults` receives `cls`, calling "
+  "`TaggedTicketRouter.with_defaults()` returns a **TaggedTicketRouter**, not the parent - "
+  "your own `__main__` demo prints exactly that. Alternative constructors inherit correctly; "
+  "hard-coding `TicketRouter(DEFAULT_RULES)` inside it would have broken subclassing.")
+
+h2("The routing engine - first match wins")
+code('''DEFAULT_RULES = [
+  {"name": "urgent-billing-to-finance-lead", "queue": "finance-lead",
+   "when": {"priority": "urgent", "category": "billing"}},      # SPECIFIC first
+  {"name": "technical-anything-to-tier2",    "queue": "tier2-tech",
+   "when": {"category": "technical"}},
+  {"name": "billing-default",                "queue": "billing-team",
+   "when": {"category": "billing"}},                             # generic later
+  {"name": "account-default",  "queue": "account-team",   "when": {"category": "account"}},
+  {"name": "general-default",  "queue": "support-triage", "when": {"category": "general"}},
+]''')
+p("The router walks rules **in order; the first matching rule wins**. That ordering is a "
+  "deliberate design decision: specific rules (urgent + billing) sit above generic ones "
+  "(any billing), resolving overlap without ambiguity or priority scores. If nothing matches, "
+  "raise a custom exception with the ticket ID - actionable, not generic. (Your current "
+  "`_rule_matches` and `route` have three real bugs here - Part 7, items 1-3, walks through "
+  "the corrected version line by line. Study that as the canonical implementation.)")
+
+h2("Inheritance and super() - TaggedTicketRouter")
+code('''class TaggedTicketRouter(TicketRouter):
+    """VIP-tagged tickets jump the queue; everything else defers to parent."""
+    VIP_QUEUE = "vip-escalation"                    # class attribute
+
+    def route(self, ticket):                        # OVERRIDE
+        if "vip-tenant" in ticket.get("tags", []):
+            return RoutingDecision(queue=self.VIP_QUEUE,
+                                   rule_name="tag-vip-override", confidence=1.0)
+        return super().route(ticket)                # DELEGATE to parent''',
+     "routing_rules.py")
+p("Textbook [[override-and-delegate]]: handle the special case the rules engine can't see "
+  "(a tag), then `super().route(ticket)` runs the original logic for everything else. No "
+  "`__init__` needed - it inherits the parent's. Note the honest trade-off an interviewer may "
+  "probe: the VIP check is hard-coded logic *outside* the rules list, so it isn't "
+  "configurable like the rest - fine for an override demo, but in production you might extend "
+  "the rule schema instead.")
+
+h2("Custom exceptions - a hierarchy, not a one-off")
+code('''class RoutingError(Exception):
+    """Base class for every routing failure."""
+
+class NoMatchingRule(RoutingError):
+    """No rule matched. Caller should apply a default queue."""
+
+class MalformedTicket(RoutingError):
+    """Ticket is missing fields the router needs."""
+    def __init__(self, ticket_id: str, missing: set[str]):
+        super().__init__(f"ticket {ticket_id} missing fields: {sorted(missing)}")
+        self.ticket_id = ticket_id
+        self.missing = missing            # structured data FOR the caller''',
+     "Corrected version (your typos fixed - Part 7, item 4)")
+bullets([
+    "Inheriting from `Exception` is the whole mechanism - constructor and string form come "
+    "free. The docstring tells callers *what to do about it*.",
+    "The **hierarchy** is the design win: `except RoutingError:` catches every routing "
+    "failure at once; `except NoMatchingRule:` targets one. Callers choose their granularity.",
+    "Rich attributes (`.ticket_id`, `.missing`) make the exception **data**, not just a "
+    "message - the caller (or an agent) can branch on exactly which fields were absent.",
+])
+box("agent", "Exceptions as agent food",
+    "When an autonomous agent hits an error, `NoMatchingRule: ticket TKT-10041` with a "
+    "`.missing` set gives it something to *reason about and recover from* - retry with "
+    "defaults, ask for the missing field, escalate. A bare `RuntimeError` gives it nothing. "
+    "Descriptive exceptions are error-recovery UX for agents.")
+
+h2("pytest - discovery, fixtures, parametrize")
+bullets([
+    "**Discovery**: pytest auto-collects `test_*.py` files and `test_*` functions. No classes, "
+    "no config, no registration.",
+    "**Fixtures** ([[dependency injection]] for tests): declare a parameter whose name matches "
+    "a `@pytest.fixture` function and pytest builds and passes it. Names must match "
+    "**exactly** - `Seed_tickets` will not find `seed_tickets` (your suite proves it; "
+    "Part 7, item 13).",
+    "**conftest.py**: fixtures placed here are auto-available to every test in the directory - "
+    "no import needed. `scope=\"session\"` (lowercase `scope`) builds once per run instead of "
+    "per test: right for read-only seed data like your 50 tickets.",
+    "**Built-in fixtures**: your `test_atomic_write_replaces_existing(tmp_path)` uses "
+    "`tmp_path` - a fresh temporary directory per test, auto-cleaned. Zero setup/teardown "
+    "code.",
+    "**pytest.raises**: `with pytest.raises(NoMatchingRule):` asserts the block raises - the "
+    "test fails if it *doesn't*. `as excinfo` exposes the exception for attribute asserts.",
+])
+code('''@pytest.mark.parametrize("category,expected_queue", [   # note the comma after ""!
+    ("billing",   "billing-team"),
+    ("technical", "tier2-tech"),
+    ("account",   "account-team"),
+    ("general",   "support-triage"),
+])
+def test_category_default(router, category, expected_queue):
+    decision = router.route(make_ticket(category=category))
+    assert decision.queue == expected_queue''',
+     "Parametrize - one function, four independent, labeled test results")
+p("Why it matters: four cases run **independently** - one failure doesn't hide the others, and "
+  "each result is labeled with its parameters so you instantly see *which* case broke. "
+  "**\"No silent failures\"** is the phrase the curriculum uses; hand it back verbatim. "
+  "Contrast with a for-loop inside one test: first failure aborts the loop and masks the rest.")
+
+h3("Interview drill - Day 4")
+qa("Class vs dict vs function - how do you choose?",
+   "[[State and behavior together]] - class. State only - dict. Behavior only - function. "
+   "TicketRouter holds rules *and* routes with them, so it earns a class.")
+qa("What does @dataclass generate, and what does frozen=True add?",
+   "`__init__`, `__repr__`, `__eq__` from the field annotations. `frozen=True` makes "
+   "instances [[immutable]] - mutation raises, the object becomes [[hashable]], and it "
+   "signals a finalized [[value object]] like my RoutingDecision.")
+qa("staticmethod vs classmethod vs property?",
+   "Static: no instance/class access - pure helper (`_rule_matches`). Classmethod: gets "
+   "`cls` - [[alternative constructors]] that respect subclasses (`with_defaults`). "
+   "Property: computed attribute behind attribute syntax (`rule_count`). All three are in "
+   "one class I wrote.")
+qa("Why first-match-wins instead of best-match scoring?",
+   "[[Deterministic and debuggable]]: ordering encodes precedence - specific above generic - "
+   "with no ambiguity and no scoring engine. To change behavior you reorder rules, and every "
+   "decision traces to exactly one named rule.")
+qa("What does super() do in your TaggedTicketRouter?",
+   "Calls the parent's implementation - I [[override]] `route` for the VIP tag, then "
+   "[[delegate]] everything else to `super().route(ticket)` so the rules engine still runs.")
+qa("Why a base RoutingError class?",
+   "An [[exception hierarchy]] lets callers pick granularity: catch `RoutingError` for any "
+   "routing failure or `NoMatchingRule` for one case - and my exceptions carry structured "
+   "attributes so handlers get data, not just a string.")
+qa("What is a pytest fixture?",
+   "[[Dependency injection]] for tests: pytest matches parameter names to fixture functions "
+   "and supplies the result. Shared ones live in conftest.py; `scope=\"session\"` builds "
+   "expensive read-only data once per run.")
+qa("Why parametrize instead of a loop in one test?",
+   "Independent, labeled results - [[no silent failures]]. A loop stops at the first bad "
+   "case and hides the rest; parametrize runs all four and names the one that broke.")
+
+# ================================================================ PART 6
+h1("Part 6 - Day 5: Decorators, Context Managers, Pydantic",
+   "One unified idea: wrap functions, resources, and data to add behavior without touching core logic.")
+
+h2("Decorators - the three-layer anatomy")
+code('''def timed(label: str | None = None):            # 1. FACTORY: takes config
+    def decorator(func):                        # 2. DECORATOR: takes the function
+        event_label = label or func.__qualname__
+
+        @wraps(func)                            # preserve name + docstring
+        def wrapper(*args, **kwargs):           # 3. WRAPPER: replaces the function
+            started = time.perf_counter()
+            try:
+                return func(*args, **kwargs)    # forward everything unchanged
+            finally:                            # logs even if func raises
+                duration_ms = round((time.perf_counter() - started) * 1000, 2)
+                _log.info("timed", label=event_label, duration_ms=duration_ms)
+        return wrapper
+    return decorator
+
+@timed()                       # parentheses REQUIRED - timed is a factory
+def route_ticket(ticket): ...
+@timed(label="enrich-batch-run")
+def run(): ...''',
+     "utils.py - your @timed, and it's better than the course baseline")
+bullets([
+    "Layer 1 makes it a [[decorator factory]] - configurable at the call site "
+    "(`@timed(label=...)`), which is exactly why the bare `@timed` without parentheses "
+    "breaks: you'd be decorating with the factory itself.",
+    "`*args, **kwargs` forwards any signature unchanged; `return func(...)` preserves the "
+    "return value - a decorator must be behavior-transparent (your "
+    "`test_timed_returns_func_result` asserts precisely this).",
+    "`@functools.wraps(func)` copies `__name__`, `__qualname__`, `__doc__` onto the wrapper. "
+    "Without it every decorated function reports as \"wrapper\" - breaking debugging, and "
+    "breaking **agents that introspect signatures**.",
+    "**Your upgrade worth bragging about**: the `try/finally` means duration logs even when "
+    "the function *raises* - the naive version silently loses timing on failures. Cross-"
+    "cutting concerns (the term: [[cross-cutting concern]]) - timing, logging, retries, "
+    "auth - all follow this shape.",
+])
+
+h2("Context managers - guaranteed setup and teardown")
+p("A context manager wraps a block with setup/teardown that runs **even on exceptions**. "
+  "You've used one all week: `with target.open() as fh:` closes the file no matter what. Two "
+  "ways to build your own: a class with `__enter__`/`__exit__`, or the shortcut you chose - "
+  "`@contextlib.contextmanager` on a generator, where `yield` marks the handoff:")
+code('''@contextmanager
+def atomic_write(path: Path, encoding: str = "utf-8"):
+    """Write to a temp file, then atomically rename over the target on success."""
+    tmp = path.with_suffix(path.suffix + ".tmp")     # demo.txt -> demo.txt.tmp
+    try:
+        with tmp.open("w", encoding=encoding) as fh:
+            yield fh                  # <- caller writes here (the with-block body)
+    except BaseException:             # ANY failure in the block...
+        if tmp.exists():
+            tmp.unlink()              # ...remove the temp file
+        raise                         # ...and re-raise: never swallow
+    else:                             # only on a clean exit:
+        os.replace(tmp, path)         # ATOMIC swap - the one-line crash-safety win''',
+     "utils.py - atomic_write, your strongest interview artifact")
+p("Why this is the piece to lead with when asked \"show me something you're proud of\": "
+  "`os.replace` is [[atomic]] at the OS level - readers see either the complete old file or "
+  "the complete new file, **never a half-written one**, even if the process dies mid-write. "
+  "Your `__main__` demo proves both paths: happy path swaps content in; a raised `BOOM` "
+  "leaves the original untouched and cleans up the temp file. Bonus vocabulary: this also "
+  "shows you can explain [[try / except / else / finally]] - `else` runs only when no "
+  "exception occurred, which most candidates cannot articulate.")
+
+h2("Pydantic - the validation boundary")
+code('''from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
+from datetime import datetime
+
+Priority = Literal["urgent", "high", "normal", "low"]      # enumerated types
+Status   = Literal["open", "in_progress", "waiting_on_customer", "resolved", "closed"]
+Category = Literal["billing", "technical", "account", "general"]
+Channel  = Literal["email", "chat", "phone", "portal"]
+
+class Ticket(BaseModel):
+    """A single customer support ticket."""
+    model_config = ConfigDict(extra="forbid")        # unknown fields -> rejected
+
+    id: str = Field(pattern=r"^TKT-\\d{5}$")
+    title: str = Field(min_length=5, max_length=200)
+    body: str = Field(min_length=1)
+    priority: Priority
+    status: Status
+    category: Category
+    tenant: str = Field(min_length=1, max_length=50)
+    customer_id: str = Field(pattern=r"^CUS-\\d{5}$")  # hyphen! (Part 7, item 6)
+    assignee: str | None = None                       # nullable field
+    channel: Channel
+    tags: list[str] = Field(default_factory=list, max_length=10)
+    created_at: datetime                              # ISO strings auto-coerced
+    updated_at: datetime''',
+     "models/ticket.py - corrected canonical version")
+code('''ticket = Ticket.model_validate(raw_dict)      # dict in -> validated object out
+dumped = ticket.model_dump()                  # object -> plain dict (serialize)
+
+try:
+    Ticket.model_validate({**raw, "priority": "blocker"})
+except ValidationError as err:
+    for detail in err.errors():               # STRUCTURED errors: loc, type, msg
+        print(detail["loc"], detail["type"], detail["msg"])''',
+     "The v2 API surface the exam will ask about")
+bullets([
+    "**The principle to recite**: Pydantic is [[the boundary between outside data and "
+    "internal logic]]. Anything external - user prompt, API response, webhook, LLM output - "
+    "gets validated and typed *before* business logic touches it.",
+    "`Literal[...]` turns strings into enumerated types: `\"blocker\"` fails validation "
+    "instantly with a structured error naming the field.",
+    "`ConfigDict(extra=\"forbid\")` rejects unexpected fields - [[strict schema]] posture: "
+    "smuggled keys and injection payloads bounce at the door.",
+    "`default_factory=list` instead of `default=[]` - the [[mutable default trap]]: a bare "
+    "`[]` default would be **one shared list across all instances**; the factory builds a "
+    "fresh list each time. Classic exam trap, and you already coded it correctly.",
+    "Validation runs **before** the ValidationError-free zone begins - malformed data and "
+    "prompt-injection strings never reach the pipeline. That's why every agent input in "
+    "Week 5 passes through a model first.",
+])
+
+h2("structlog - logs as data")
+p("`log.info(\"ticket_classified\", ticket_id=\"TKT-10001\", priority=\"urgent\", "
+  "confidence=0.94)` emits an **event name plus key-value pairs**, not a prose sentence. "
+  "Structured logs are machine-queryable - filter every event where `duration_ms > 3000` - "
+  "which is precisely what observability and eval harnesses consume later. Your "
+  "`configure_logging` adds the production touch: JSON renderer when stderr is not a "
+  "terminal (CI/prod), pretty console renderer for humans, resolved as "
+  "**explicit arg > environment variable > default** - a pattern worth naming in interviews.")
+
+h3("Interview drill - Day 5")
+qa("Walk me through the three layers of a parameterized decorator.",
+   "[[Factory]] takes configuration and returns the decorator; [[decorator]] takes the "
+   "function; [[wrapper]] replaces it - forwarding `*args, **kwargs`, adding behavior around "
+   "`func(...)`, preserving the return. That layering is why `@timed()` needs parentheses.")
+qa("Why @functools.wraps?",
+   "It copies the wrapped function's `__name__` and `__doc__` onto the wrapper. Skip it and "
+   "everything reports as \"wrapper\" - wrecking logs, debuggers, and any agent introspecting "
+   "signatures to plan tool calls.")
+qa("What guarantee does a context manager give?",
+   "[[Teardown runs even on exceptions]]. `with` is the syntax; `__enter__`/`__exit__` or "
+   "`@contextmanager` with `yield` as the handoff point is the mechanism. Files, DB "
+   "sessions, locks - anything that must be released.")
+qa("Why is your atomic_write actually atomic?",
+   "All writes go to a temp file; on clean exit `os.replace` swaps it over the target in "
+   "[[one atomic OS operation]] - readers see old-complete or new-complete, never a torn "
+   "file. On failure the temp is unlinked and the original is untouched.")
+qa("When does the else clause of try/except run?",
+   "Only when the try block raised [[nothing]] - it separates the success path from the "
+   "protected code, which is exactly where my `os.replace` belongs: swap only on success.")
+qa("What does Pydantic buy you over isinstance checks?",
+   "A declarative [[typed contract]] at the boundary: constraints (`pattern`, lengths), "
+   "enumerated `Literal`s, coercion (ISO string -> datetime), `extra=\"forbid\"` strictness, "
+   "and structured errors - all before my logic runs. Hand-rolled checks scatter and drift.")
+qa("default=[] vs default_factory=list?",
+   "The [[mutable default trap]]: `default=[]` is evaluated once and shared by every "
+   "instance; `default_factory=list` builds a fresh list per instance. Same trap exists in "
+   "plain function defaults - never use a mutable literal as a default.")
+qa("Why structured logging over print statements?",
+   "Events with key-value pairs are [[machine-queryable]] - I can filter, aggregate, and "
+   "alert on fields like `duration_ms`. Prints are strings for humans; structured events "
+   "feed dashboards, and later, agent-eval harnesses.")
+
+# ================================================================ PART 7
+h1("Part 7 - 14 Bugs Found in YOUR Code",
+   "Each one is a concept the exam can test. Fix them in order, re-run pytest after each, "
+   "and you will have revised the entire week hands-on.")
+
+p("Severity legend: items 1-7 stop the program or fail every test; 8-12 break specific "
+  "features; 13-14 break the test suite itself. Every fix below is the complete corrected "
+  "code - type it in yourself rather than pasting; the typing is the revision.")
+
+h2("routing_rules.py")
+box("bug", "1. route() - `Self` vs `self`, and a phantom attribute",
+    "`def route(Self, ticket)` capitalizes the parameter, so inside the body `self` is "
+    "**undefined** - `self.rules` raises `NameError` on the first call. And even once "
+    "renamed, the attribute is `self._rules` (set in `__init__`), not `self.rules`. "
+    "**Concept**: `self` is a naming *convention*, not a keyword - the first parameter is "
+    "whatever you name it, which is exactly how this bug is possible.")
+box("bug", "2. _rule_matches() - three logic errors that make EVERY rule match",
+    "(a) `return True` sits **inside** the for-loop, so only the first field is ever "
+    "checked. (b) The tuple branch tests `actual is not expected` - [[identity]] "
+    "(same object?) instead of [[membership]] (`not in`) - so tuple rules can never match. "
+    "(c) The `elif actual != expected` is **nested under** the `isinstance` check, so for "
+    "normal string rules no comparison happens at all. Net observable behavior: the function "
+    "returns True for everything, first rule always wins, and **all 50 tickets route to "
+    "finance-lead**. Run it and watch - then fix it. "
+    "**Concepts**: return placement in loops, `is` vs `==` vs `in`, if/elif structure.")
+box("bug", "3. route() raises RuntimeError - but you built custom exceptions for this",
+    "Your tests expect `NoMatchingRule`, and `_REQUIRED_FIELD` is defined but never used - "
+    "so `MalformedTicket` can never fire either. Wire both in. "
+    "**Concept**: exception hierarchies only pay off if you actually raise them.")
+box("fix", "Items 1-3 together - the canonical route/_rule_matches",
+    "This corrected pair is the single most likely code the exam will probe. Read it until "
+    "you can rewrite it from memory:")
+code('''_REQUIRED_FIELDS = {"priority", "category"}
+
+@staticmethod
+def _rule_matches(rule: dict[str, Any], ticket: dict[str, Any]) -> bool:
+    for field, expected in rule["when"].items():
+        actual = ticket.get(field)
+        if isinstance(expected, tuple):
+            if actual not in expected:        # MEMBERSHIP, not identity
+                return False
+        elif actual != expected:              # elif pairs with isinstance
+            return False
+    return True                               # AFTER the loop: all fields matched
+
+def route(self, ticket: dict[str, Any]) -> RoutingDecision:
+    missing = _REQUIRED_FIELDS - ticket.keys()
+    if missing:
+        raise MalformedTicket(ticket.get("id", "<no id>"), missing)
+    for rule in self._rules:                  # self, and _rules
+        if self._rule_matches(rule, ticket):
+            return RoutingDecision(queue=rule["queue"],
+                                   rule_name=rule["name"], confidence=1.0)
+    raise NoMatchingRule(f"no rule fired for ticket {ticket.get('id', '<no id>')}")''')
+box("bug", "4. MalformedTicket.__init__ - three typos, one NameError",
+    "Parameter is `mission`, body references `missing` (NameError), and assigns "
+    "`self.missiong`. Your test asserts on `.missing`, so the contract is: parameter "
+    "`missing`, attribute `self.missing`. The corrected class is printed in Part 5. "
+    "**Concept**: exception attributes are an API - tests depend on their exact names.")
+
+h2("models/ - Pydantic package")
+box("bug", "5. Import chain broken twice",
+    "`models/__init__.py` imports from `support_api.models.ticker` - the module is "
+    "`ticket`. And the class is defined as `Tickets` (plural) while `__init__` and every "
+    "test import `Ticket`. Fix: rename the class to `Ticket`, fix the module name in the "
+    "import. **Concept**: `ImportError` vs `AttributeError` - wrong module path vs wrong "
+    "name inside a real module - know which each typo produces.")
+box("bug", "6. customer_id pattern rejects ALL real data",
+    "`Field(pattern=r\"^CUS\\d{5}$\")` has no hyphen - but every ticket carries "
+    "`CUS-10001` style IDs, so **all 50 seed tickets fail validation**. Fix: "
+    "`r\"^CUS-\\d{5}$\"` (your Customer model already has it right). "
+    "**Concepts**: regex literal characters and anchors - and the deeper lesson: your "
+    "`test_every_seed_ticket_validates` exists precisely to catch this drift. Once the "
+    "suite runs, this bug is exactly what it will catch first. That is the story of *why "
+    "we test* - tell it in the interview.")
+
+h2("tests/conftest.py")
+box("bug", "7. Three bugs in fifteen lines",
+    "(a) `@pytest.fixture(Scope=\"session\")` - capital S is an unexpected keyword: "
+    "TypeError. (b) `def seed_tickets(data_dir: PAth)` - parameter annotations are "
+    "**evaluated at def time**, so the `PAth` typo raises NameError the moment conftest "
+    "loads, which kills the *entire* suite before one test runs. (c) `data_dir` climbs two "
+    "parents from `tests/` - that lands on `src/support_api/data`, which doesn't exist; the "
+    "data lives at the project root. **Concepts**: keyword-argument exactness, annotation "
+    "evaluation timing, path arithmetic.")
+box("fix", "Corrected conftest.py - with one source of truth for the path", "")
+code('''"""Shared pytest fixtures."""
+import json
+from pathlib import Path
+import pytest
+
+from support_api.filters import _DATA_DIR      # ONE definition of where data lives
+
+@pytest.fixture(scope="session")               # lowercase scope
+def data_dir() -> Path:
+    return _DATA_DIR
+
+@pytest.fixture(scope="session")
+def seed_tickets(data_dir: Path) -> list[dict]:
+    return json.loads((data_dir / "tickets.json").read_text(encoding="utf-8"))''')
+box("tip", "The `Data` vs `data` landmine (screenshot evidence)",
+    "Your project folder is `Data/` (capital D) but `filters.py` builds the path as "
+    "`... / \"data\"`. On your Mac this works because APFS is case-insensitive by default - "
+    "**inside a Linux container it is FileNotFoundError**. The curriculum explicitly "
+    "mentions deploy-time path portability; rename the folder to lowercase `data/` now. "
+    "This is a superb \"works on my machine\" story for the interview.")
+
+h2("stream.py")
+box("bug", "8. take() - one real crash, one invisible non-crash",
+    "`result.apend(ticket)` -> `AttributeError` (typo for `append`) - that's the real "
+    "bug. But `result: List[TicketDict] = []` with capital-L `List` never imported does "
+    "**not** crash, because local-variable annotations are never evaluated (contrast with "
+    "conftest's `PAth`, which did). Fix both: `append`, and lowercase built-in `list`. "
+    "**Concept**: the annotation-evaluation asymmetry - a beautiful exam question because "
+    "the same typo class behaves oppositely in two positions.")
+box("bug", "9. Nested same-type quotes in f-strings - a Python-version story",
+    "`f\"{ticket[\"id\"]}\"` in your `__main__` demo is a **SyntaxError on Python 3.11** - "
+    "your interpreter, per the `.pyc` files - but legal on 3.12+ (PEP 701 lifted the "
+    "restriction). Fix for 3.11: single quotes inside, `f\"{ticket['id']}\"`. "
+    "**Concept**: version-awareness; knowing a PEP number by name is interview gold.")
+
+h2("filters.py")
+box("bug", "10. format_ticket_row returns a set, not a string",
+    "The return wraps the f-strings in `{ }` - curly braces build a **set literal**, so a "
+    "function annotated `-> str` returns `{'TKT-10001 high ...'}` (one element, because "
+    "adjacent f-strings concatenate first). Fix: drop the braces; use parentheses for "
+    "multi-line implicit concatenation. **Concepts**: set-literal syntax, implicit string "
+    "concatenation, and honoring your own type hints.")
+code('''def format_ticket_row(ticket: TicketDict) -> str:
+    short_title = ticket["title"]
+    if len(short_title) > 50:
+        short_title = short_title[:47] + "..."
+    return (                                   # parentheses, not braces
+        f"{ticket['id']:<10}"
+        f"{ticket['priority']:<8}"
+        f"{ticket['status']:<20}"
+        f"{short_title}"
+    )''')
+
+h2("loggin.py and enrich.py")
+box("bug", "11. structlog.configure - three argument bugs",
+    "(a) `Processors=` capital P: unexpected keyword. (b) `structlog.dev.ConsoleRenderer` "
+    "passed as a **class, not an instance** - the JSON branch correctly calls "
+    "`JSONRenderer()`; mirror it: `ConsoleRenderer()`. (c) `wrapper_class="
+    "structlog.make_filtering_bound_logger` - that's a **factory needing the level**: "
+    "`make_filtering_bound_logger(log_level)`. **Concept**: class vs instance vs factory - "
+    "three ways to hand something callable-shaped to an API, only one correct per slot.")
+box("tip", "The accidental genius of the filename",
+    "`loggin.py` looks like a typo of `logging.py` - but naming it `logging.py` would "
+    "[[shadow]] the standard library: `import logging` would import *your* file and break "
+    "structlog's internals. Never name modules after stdlib modules. If asked, rename to "
+    "`log_config.py` - clear and collision-free.")
+box("bug", "12. enrich.py - asyncio imported in the wrong place",
+    "`enrich_batch` uses `asyncio.Semaphore` and `asyncio.gather`, but `import asyncio` "
+    "lives inside the `__main__` block - so the file works when run directly and raises "
+    "NameError the moment another module imports `enrich_batch`. Move `import asyncio` to "
+    "the top. **Concept**: module-level dependencies belong at module level; `__main__` is "
+    "only for demo-time extras.")
+
+h2("tests/ - the suite itself")
+box("bug", "13. test_routing_rules.py - six distinct problems",
+    "(a) Imports are garbled: `Maltormedlicket`, `Noratchingkule` -> `MalformedTicket`, "
+    "`NoMatchingRule`. (b) `RoutingDecision` is used but never imported. (c) parametrize "
+    "is **missing the comma** between the argnames string and the list - Python parses it "
+    "as string *subscription*: `TypeError: string indices must be integers` at collection "
+    "time (3.12 even warns \"perhaps you missed a comma?\"). (d) `\"technicle\"` typo "
+    "guarantees a NoMatchingRule failure in that parameter set - and when it fires, the "
+    "parametrize label will point straight at it: the feature demonstrating its own value. "
+    "(e) `TaggedTickerRouter` typo, and that test references the `router` fixture without "
+    "declaring it as a parameter -> NameError. (f) The MalformedTicket assert expects "
+    "`{\"category\", \"priority\"}` - but the test's ticket *has* priority, so missing is "
+    "`{\"category\"}` only. **Concepts**: parametrize anatomy, fixture injection rules, "
+    "set arithmetic on requireds.")
+box("bug", "14. Fixture names must match EXACTLY - and assert non-emptiness",
+    "`Seed_tickers`, `Seed_tickets`, `seed_tickets` all appear across test_filters and "
+    "test_models - pytest matches fixture *parameter names exactly*, so the misspelled ones "
+    "die with \"fixture not found\". Standardize on `seed_tickets`. While you're there, "
+    "strengthen the weak asserts: `all(t[\"priority\"] == \"urgent\" for t in urgent)` is "
+    "**vacuously true on an empty list** - add `assert urgent`, so a broken filter that "
+    "returns nothing actually fails. **Concepts**: fixture matching, vacuous truth.")
+
+h2("Definition of done")
+code('''cd supportapi
+source .venv/bin/activate
+pytest -q                # target: all green
+pytest -q -x             # during fixing: stop at first failure
+pytest -q --lf           # re-run only last failures - your fix loop''')
+p("When the suite is green you will have touched: naming conventions, identity vs equality "
+  "vs membership, loop/return placement, exception design, import mechanics, annotation "
+  "evaluation, regex literals, set literals, f-string versioning, keyword exactness, "
+  "class-vs-instance, fixture injection, and parametrize anatomy. That *is* the exam.")
+
+# ================================================================ PART 8
+h1("Part 8 - The Agentic AI Bridge",
+   "The Stormer Tip, operationalized: every Week 1 pattern is a Week 3-10 pattern in disguise.")
+
+tab(["Week 1 pattern (your code)", "Where it reappears in agent systems"],
+    [["Generators / `stream_tickets` pipeline",
+      "Context management: feed an agent one chunk at a time - avoiding [[context bloat]] "
+      "is the same discipline as avoiding memory bloat. LangChain streams tokens and "
+      "documents through exactly this lazy-iterator shape."],
+     ["Pydantic `Ticket` model, `Literal` types, `extra=\"forbid\"`",
+      "[[Structured outputs]] and tool-input schemas: an agent's response is validated "
+      "against a model so it's predictable; tool arguments are validated before execution. "
+      "Also the anti-prompt-injection boundary - malformed input dies before the LLM."],
+     ["Type hints / `Callable[[dict], bool]` contracts",
+      "[[Function-calling schemas]]: frameworks generate the tool JSON an LLM reads from "
+      "your signatures and docstrings. Untyped functions = tools the model can't use well."],
+     ["`matches()` closure factory",
+      "Tool factories: manufacture configured tools per tenant/user at runtime. LangChain "
+      "retriever and tool constructors are this exact higher-order shape."],
+     ["`@timed` decorator + `@wraps`",
+      "Callbacks, retries, tracing: LangChain wraps every chain/tool call the same "
+      "three-layer way. `@wraps` is why introspection still works after wrapping."],
+     ["`atomic_write` context manager",
+      "Resource lifecycles: Flask request context (Week 2), agent memory sessions "
+      "(Week 6), DB/vector-store connections - guaranteed cleanup on failure."],
+     ["`RoutingError` hierarchy with rich attributes",
+      "[[Agent error recovery]]: descriptive exceptions give the agent something to reason "
+      "about - retry, fallback queue, escalate - instead of dying on RuntimeError."],
+     ["`TicketRouter` first-match rules",
+      "Deterministic routing baseline: Week 3+ replaces `when` mappings with an LLM "
+      "classifier, but the decide-then-dispatch scaffold and RouteDecision stay. You'll "
+      "diff the LLM's decisions against this rules engine - that's an [[eval]]."],
+     ["structlog events + `duration_ms`",
+      "[[LLMOps / observability]]: token counts, latencies, tool-call outcomes are "
+      "structured events. Your timing decorator is a proto-tracing layer."],
+     ["`enrich.py` semaphore + `asyncio.gather`",
+      "Concurrent tool calls with a cap: fan out API/LLM calls, bounded by a semaphore so "
+      "you respect rate limits - verbatim the production pattern."]],
+    [2.15 * inch, CW - 2.15 * inch])
+box("agent", "Your differentiation thesis, stated once",
+    "Most of the cohort will treat Week 1 as syntax to survive. The bridge above is the "
+    "deeper claim to make in interviews: **the eval and observability layer starts here** - "
+    "a structlog event stream plus a timing decorator plus a deterministic rules baseline is "
+    "already the skeleton of an evaluation harness for the LLM router you'll build later. "
+    "Owning that layer is rarer than owning prompts, and it's the exact grounding-layer "
+    "thinking your Field Ops Copilot design runs on.")
+
+
+# ================================================================ PART 9
+h1("Part 9 - Mock Interview Drill",
+   "The 60-second walkthrough, rapid-fire terms, code-reading traps, design questions, and your bug story.")
+
+h2("The 60-second project walkthrough (memorize the beats, not the words)")
+code('''"I built support-api, a ticketing platform in idiomatic Python - it's the base
+I'll grow into an agent system over the next nine weeks.
+
+The data layer is 50 realistic tickets and 20 customers across three tenants,
+loaded from JSON. filters.py handles eager work - list/set/dict comprehensions,
+case-insensitive priority filters, tenant isolation, and a matches() closure
+factory that manufactures reusable predicate filters.
+
+stream.py re-does that lazily: a generator streams tickets one at a time, and
+where / tag / take compose into a pipeline that never holds more than one
+record in memory - the same discipline that prevents context bloat in agents.
+
+routing_rules.py is the decision engine: a TicketRouter with ordered
+first-match-wins rules, a frozen RoutingDecision dataclass, a VIP subclass
+that overrides and delegates via super(), and a custom exception hierarchy
+so callers - or later, agents - get actionable failures.
+
+The boundary is Pydantic: a Ticket model with Literal enums, field
+constraints, and extra='forbid', so nothing malformed reaches the logic.
+Cross-cutting concerns are a @timed decorator and an atomic_write context
+manager, logging goes through structlog as structured events, and a pytest
+suite with session-scoped fixtures and parametrized cases proves it all -
+it actually caught a regex bug in my customer_id validation."''',
+     "Say it out loud five times this weekend. Beats > memorization.")
+
+h2("Rapid-fire round - term first, always")
+qa("Define lazy evaluation.",
+   "Computing values [[only when requested]] rather than up front. Generators are the "
+   "mechanism: my ticket stream produces one record per pull, O(1) memory.")
+qa("Define a closure.",
+   "A function that [[captures variables from its enclosing scope]] and retains them after "
+   "that scope returns - `matches()` returns `apply`, which permanently remembers its "
+   "predicate.")
+qa("Define a predicate.",
+   "A function returning a [[boolean]], used as a test - the `Callable[[dict], bool]` "
+   "passed to my `where()` filter.")
+qa("Define idempotent.",
+   "Safe to run [[multiple times with the same end state]] - my `configure_logging` is "
+   "designed idempotent so repeated setup calls don't stack handlers.")
+qa("is vs == vs in?",
+   "`is` compares [[identity]] (same object), `==` compares [[equality]] (same value), "
+   "`in` tests [[membership]]. My router bug used `is not` where `not in` belonged - tuple "
+   "rules could never match.")
+qa("Define hashable, and why dict keys must be.",
+   "Has a stable hash for its lifetime - which requires [[immutability]]. Dicts and sets "
+   "locate entries by hash, so tuples and frozen dataclasses qualify; lists don't.")
+qa("Define materialize.",
+   "Turning a lazy stream into a [[concrete in-memory collection]] - my `take(stream, 5)` "
+   "is the deliberate materialization point ending the pipeline.")
+qa("Define a cross-cutting concern.",
+   "Behavior needed across many functions - timing, logging, retries, auth - that "
+   "[[decorators]] attach without touching business logic.")
+qa("Define shadowing.",
+   "A local name [[hiding]] an outer one - classic footgun: naming a module `logging.py` "
+   "hides the standard library from your own imports.")
+qa("Define vacuous truth (a testing gotcha).",
+   "`all()` over an [[empty sequence is True]] - so a filter test that only asserts "
+   "`all(...)` passes even when the filter returns nothing. Guard with `assert results`.")
+qa("EAFP vs LBYL?",
+   "[[Easier to Ask Forgiveness than Permission]] - try it and catch the exception - vs "
+   "Look Before You Leap - check first. Python idiom favors EAFP: `try: validate / except "
+   "ValidationError` over pre-checking every field.")
+qa("StopIteration - who raises it and who handles it?",
+   "An exhausted iterator raises it on `next()`; a [[for loop absorbs it]] silently as its "
+   "termination signal. Calling `next()` manually means handling it - or passing a default: "
+   "`next(gen, None)`.")
+
+h2("Code-reading traps - from your own files")
+qa("What does this return, and why is the annotation a lie?  "
+   "`return { f\"{t['id']:<10}\" f\"{t['priority']:<8}\" }`",
+   "A **set with one string** - adjacent f-strings concatenate ([[implicit string "
+   "concatenation]]), then `{ }` makes a [[set literal]]. Annotated `-> str`, returns "
+   "`set`. Fix: parentheses.")
+qa("Why does `def f(x: PAth)` crash at import but `y: List[int] = []` inside a "
+   "function never does?",
+   "Parameter annotations are [[evaluated at def time]]; local-variable annotations are "
+   "[[never evaluated]] - pure metadata. Same undefined-name typo, opposite outcomes.")
+qa("`@pytest.mark.parametrize(\"a,b\" [ (1,2) ])` - what error, and when?",
+   "Missing comma turns it into [[string subscription]]: `\"a,b\"[(1,2)]` -> `TypeError: "
+   "string indices must be integers` - at **collection time**, before any test runs. "
+   "Python 3.12 even warns 'perhaps you missed a comma?'.")
+qa("First matching rule wins, and _rule_matches has `return True` inside the loop. "
+   "What routes where?",
+   "Only the **first field** of the first rule is ever evaluated - and with the equality "
+   "check mis-nested, nothing is compared at all, so rule one always fires: [[every ticket "
+   "goes to finance-lead]]. Return placement decides loop semantics: success returns "
+   "belong *after* the loop.")
+qa("What does calling stream_tickets() print?",
+   "**Nothing** - no body code runs; it returns a [[generator object]]. Output starts only "
+   "when something pulls: `next()`, a for loop, or `take()`.")
+qa("A test asserts `all(t[\"priority\"] == \"urgent\" for t in urgent)` and passes. "
+   "Is filter_by_priority proven correct?",
+   "No - if the filter returned an [[empty list]] the assert is vacuously true. Add "
+   "`assert urgent` (non-empty) or assert an expected count from the seed data.")
+qa("`with atomic_write(target) as fh: fh.write(\"X\"); raise RuntimeError` - "
+   "what's in target afterward?",
+   "The [[original content, untouched]] - the except path unlinks the temp file and "
+   "re-raises; `os.replace` only runs in the `else` (clean-exit) branch. That's the whole "
+   "point of atomic writes.")
+qa("Why does @timed (no parentheses) break while @timed() works?",
+   "`timed` is a [[decorator factory]] - it returns the decorator. Without parentheses "
+   "you decorate with the factory itself, so calling the function returns the inner "
+   "`decorator` instead of running your code.")
+
+h2("Design questions - the \"why\" layer")
+qa("Why validate with Pydantic instead of checking fields in the router?",
+   "[[Separation of boundary and logic]]: validation happens once, declaratively, at the "
+   "edge - so every downstream component trusts its input. Scattered checks drift and get "
+   "skipped; a model is a single typed contract, and it's the anti-injection choke point "
+   "for agent inputs.")
+qa("Why is RoutingDecision frozen?",
+   "A decision is a [[fact, not a workspace]] - immutability prevents downstream mutation "
+   "bugs, makes it hashable for dedup/caching, and documents intent in one flag.")
+qa("Why ordered rules instead of ML from day one?",
+   "[[Deterministic baseline first]]: explainable, testable, zero-cost. When the Week 3 "
+   "LLM classifier arrives, this engine becomes the eval baseline I diff it against - you "
+   "can't measure a model without a ground truth to compare.")
+qa("Why does take() use return while where() uses yield?",
+   "Pipelines need [[lazy stages and one eager terminus]]. Stages yield to stay "
+   "composable; the terminus materializes results. Making take a generator would mean "
+   "nothing ever executes.")
+qa("Your enrichment is async with a semaphore - why both?",
+   "`asyncio.gather` gives [[concurrency]] for I/O-bound HTTP calls; the "
+   "[[semaphore]] caps in-flight requests so I respect rate limits and don't stampede the "
+   "API - concurrency with a governor, which is exactly how parallel LLM tool calls run.")
+
+h2("\"Tell me about a bug you debugged\" - your STAR story, ready-made")
+p("**Situation**: My ticket router passed a smoke test - every ticket got a queue - but "
+  "every single one landed in `finance-lead`. **Task**: Find why five ordered rules "
+  "behaved like one. **Action**: I isolated `_rule_matches` and walked it line by line. "
+  "Three compounding issues: a `return True` *inside* the field loop, so at most one field "
+  "was ever checked; an identity test (`is not`) where membership (`not in`) belonged, so "
+  "tuple-valued rules could never match; and the equality `elif` nested under the "
+  "`isinstance` branch, so plain string rules were never compared at all - the function "
+  "returned True unconditionally and rule one always fired. I restructured it: tuple branch "
+  "uses `not in`, the `elif` handles scalars, and the success `return True` moved *after* "
+  "the loop. **Result**: All five default rules routed correctly across the 50-ticket seed, "
+  "my parametrized pytest cases went green, and I added a regression test asserting an "
+  "unknown category raises `NoMatchingRule` - so the failure mode is now a contract, not a "
+  "surprise. Lesson I keep: `assert all-fields-matched` logic must return success **after** "
+  "the loop, and `is` is for identity, never values.")
+
+h2("Terminology bank - the words to produce under pressure")
+tab(["Say this...", "...when the topic is"],
+    [["lazy evaluation / generator object / single-pass / StopIteration / materialize",
+      "generators, yield, streaming, memory"],
+     ["closure / higher-order function / first-class functions / factory / predicate",
+      "matches(), lambdas, function arguments"],
+     ["immutable / hashable / value object / DTO / frozen",
+      "tuples, dataclasses, dict keys"],
+     ["identity vs equality vs membership (is / == / in)",
+      "comparisons, the router bug"],
+     ["alternative constructor / override and delegate / class attribute",
+      "classmethod, super(), inheritance"],
+     ["cross-cutting concern / decorator factory / wrapper / @wraps",
+      "timing, logging, retries"],
+     ["context manager / setup-teardown guarantee / atomicity / os.replace",
+      "with-blocks, atomic_write"],
+     ["validation boundary / typed contract / Literal enum / strict schema / coercion",
+      "Pydantic, external data, injection defense"],
+     ["dependency injection / fixture scope / parametrize / no silent failures / vacuous truth",
+      "pytest"],
+     ["dependency isolation / editable install / manifest / entry-point guard",
+      "venv, pyproject.toml, __main__"],
+     ["structured logging / observability / eval baseline / context bloat",
+      "structlog, LLMOps, the agent bridge"]],
+    [3.35 * inch, CW - 3.35 * inch])
+
+# ================================================================ PART 10
+h1("Part 10 - One-Page Cheat Sheet",
+   "The night-before and morning-of review. If you can reproduce this page, you're ready.")
+
+code('''# --- COMPREHENSIONS (SELECT/WHERE in one line) ---------------------------
+[t["title"] for t in ts if t["priority"] == "urgent"]     # list
+{t["tenant"] for t in ts}                                 # set (unique)
+{t["id"]: t["title"] for t in ts}                         # dict (lookup)
+{tag for t in ts for tag in t.get("tags", [])}            # nested
+# eager, O(n) memory  ->  scale answer: generators
+
+# --- GENERATOR + PIPELINE ------------------------------------------------
+def gen():  yield item          # call -> generator object; body runs on pull
+next(g)                         # one item; exhausted -> StopIteration
+take(tag(where(s, pred), f, fn), 5)   # lazy stages, eager terminus
+{**t, "new": v}                 # copy + add field, never mutate
+
+# --- CLOSURE FACTORY -----------------------------------------------------
+def matches(pred):              # higher-order: func in, func out
+    def apply(ts): return [t for t in ts if pred(t)]
+    return apply                # apply CLOSES OVER pred
+
+# --- DATACLASS / METHOD TRIO ---------------------------------------------
+@dataclass(frozen=True)         # __init__ __repr__ __eq__; immutable+hashable
+@staticmethod                   # no self/cls - pure helper
+@classmethod                    # cls - alt constructor, subclass-safe
+@property                       # computed attr, no ()
+
+# --- EXCEPTIONS ----------------------------------------------------------
+class RoutingError(Exception): ...          # hierarchy: catch base or leaf
+raise NoMatchingRule(f"...{tid}")           # rich attrs = data for callers
+try: ... except X: ... else: ...            # else = only if NO exception
+
+''')
+
+code('''# --- DECORATOR (3 layers) ------------------------------------------------
+def timed(label=None):                      # factory (config)
+    def deco(fn):                           # takes function
+        @wraps(fn)                          # keep __name__/__doc__
+        def wrap(*a, **kw):                 # replaces fn
+            t0 = perf_counter()
+            try: return fn(*a, **kw)
+            finally: log.info("timed", duration_ms=...)
+        return wrap
+    return deco                             # so @timed() NEEDS parens
+
+# --- CONTEXT MANAGER -----------------------------------------------------
+@contextmanager
+def atomic_write(path):
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    try:
+        with tmp.open("w") as fh: yield fh  # handoff point
+    except BaseException:
+        tmp.unlink(missing_ok=True); raise  # cleanup, never swallow
+    else:
+        os.replace(tmp, path)               # ATOMIC swap on success only
+
+# --- PYDANTIC v2 ---------------------------------------------------------
+class Ticket(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(pattern=r"^TKT-\\d{5}$")
+    priority: Literal["low","normal","high","urgent"]
+    tags: list[str] = Field(default_factory=list)   # NEVER default=[]
+Ticket.model_validate(raw)   # in     ValidationError.errors() -> loc/type/msg
+ticket.model_dump()          # out
+
+# --- PYTEST --------------------------------------------------------------
+pytest -q  |  -x stop-first  |  --lf last-failed  |  -k "name"
+@pytest.fixture(scope="session")            # conftest.py = auto-shared
+@pytest.mark.parametrize("a,b", [(...)])    # COMMA! independent labeled cases
+with pytest.raises(NoMatchingRule): ...     # asserts it raises
+tmp_path                                    # built-in fresh temp dir
+
+# --- REGEX ---------------------------------------------------------------
+r"\\b[45]\\d{2}\\b"    raw \\b boundary  [45] class  \\d{2} repeat  ($499 caveat!)
+re.search -> first/None (boolean)   re.findall -> all (extract)
+
+# --- ENV -----------------------------------------------------------------
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"        # edit pyproject.toml THEN install - two steps
+ticket.get("k", default)       # external data: never bare ["k"]''')
+
+p("**Final word.** You didn't just study this material - you built a working system with "
+  "it, found real bugs in it, and can explain every design decision in it. That's a "
+  "stronger position than anyone walking in with memorized definitions. Name the term, "
+  "give the sentence, point at your code. See you on the other side of the exam.")
+
+# ---------------------------------------------------------------- build
+doc = Guide("/home/claude/week1_python_study_guide.pdf")
+first = story[0]
+# switch template after cover
+from reportlab.platypus import NextPageTemplate
+story_final = [NextPageTemplate("body")] + story
+doc.build(story_final)
+print("PDF built OK")
